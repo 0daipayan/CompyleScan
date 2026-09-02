@@ -14,9 +14,25 @@ const isFieldPresent = (field) => {
   return field && field.value !== null && field.value !== undefined && String(field.value).trim() !== '';
 };
 
-// Helper function to evaluate LMPC compliance rules from the direct JSON structure
+// Helper function to evaluate all 9 LMPC compliance rules from the direct JSON structure
 const evaluateLmpcRules = (aiData) => {
   const rules = [
+    {
+      ruleId: 'product_name_present',
+      ruleName: 'Product Name Declaration',
+      status: isFieldPresent(aiData.product_name) ? 'PASS' : 'FAIL',
+      message: isFieldPresent(aiData.product_name)
+        ? `Product Name declared: ${aiData.product_name.value}`
+        : 'Generic or specific product name missing'
+    },
+    {
+      ruleId: 'manufacturer_present',
+      ruleName: 'Manufacturer / Packer Name & Address',
+      status: isFieldPresent(aiData.manufacturer) ? 'PASS' : 'FAIL',
+      message: isFieldPresent(aiData.manufacturer)
+        ? `Manufacturer declared: ${aiData.manufacturer.value}`
+        : 'Manufacturer/Packer name or address missing'
+    },
     {
       ruleId: 'mrp_present',
       ruleName: 'MRP Declaration',
@@ -24,6 +40,14 @@ const evaluateLmpcRules = (aiData) => {
       message: isFieldPresent(aiData.mrp) 
         ? `MRP declared: ${aiData.mrp.unit || '₹'} ${aiData.mrp.value}` 
         : 'Maximum Retail Price (MRP) declaration missing'
+    },
+    {
+      ruleId: 'unit_sale_price_present',
+      ruleName: 'Unit Sale Price Standard',
+      status: isFieldPresent(aiData.unit_sale_price) ? 'PASS' : 'FAIL',
+      message: isFieldPresent(aiData.unit_sale_price)
+        ? `Unit Sale Price declared: ${aiData.unit_sale_price.unit || '₹'} ${aiData.unit_sale_price.value}`
+        : 'Unit sale price declaration missing'
     },
     {
       ruleId: 'net_qty_present',
@@ -40,6 +64,14 @@ const evaluateLmpcRules = (aiData) => {
       message: isFieldPresent(aiData.manufacture_date) 
         ? `Mfg Date declared: ${aiData.manufacture_date.value}` 
         : 'Date of manufacture or packing missing'
+    },
+    {
+      ruleId: 'best_before_present',
+      ruleName: 'Best Before / Expiry Date',
+      status: isFieldPresent(aiData.best_before) ? 'PASS' : 'FAIL',
+      message: isFieldPresent(aiData.best_before)
+        ? `Best Before declared: ${aiData.best_before.value}`
+        : 'Expiry or Best Before statement missing'
     },
     {
       ruleId: 'consumer_care_present',
