@@ -1,0 +1,5 @@
+﻿ocr/venv/
+ocr/__pycache__/
+ocr/output/
+__pycache__/
+*.pyc
