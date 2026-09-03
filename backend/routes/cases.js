@@ -54,7 +54,7 @@ router.post('/evaluate', auth, upload.single('packageImage'), async (req, res) =
         // 3. Map your Python report directly into your Case Schema definition
         const newCase = new Case({
             caseId: `LM-${Math.random().toString(36).substr(2, 4).toUpperCase()}`, // Generates dynamic case tracking reference
-            productName: req.body.productName || ocr_data?.extracted_fields?.product_name?.value || 'Unknown Product',
+            productName: req.body.productName || report.ocr_data?.extracted_fields?.product_name?.value || 'Unknown Product', // FIXED: changed ocr_data to report.ocr_data
             category: req.body.category || 'General Goods',
             company: req.body.company || 'Unknown Corporation',
             createdBy: req.user.id,
