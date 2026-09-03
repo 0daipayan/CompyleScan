@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Isolated database cluster running your local data stores
+  database:
+    image: mongo:latest
+    container_name: compylescan-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  # AI Core Engine wrapping OCR extractors and Metrology validation checks
+  ai-core:
+    build:
+      context: .
+      dockerfile: ./ocr/Dockerfile
+    container_name: compylescan-ai-core
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV_MODE=production
+    depends_on:
+      - database
+
+  # Node.js backend orchestration layer managing APIs and schemas
+  backend:
+    build:
+      context: ./backend
+    container_name: compylescan-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - MONGO_URI=mongodb://database:27017/compylescan
+      - AI_ENGINE_URL=http://ai-core:8000
+    depends_on:
+      - database
+      - ai-core
+
+volumes:
+  mongo-data:
