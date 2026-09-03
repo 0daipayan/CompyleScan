@@ -1,0 +1,92 @@
+{
+    "summary": {
+        "total_rules": 9,
+        "passed": 6,
+        "failed": 2,
+        "review": 0,
+        "not_applicable": 1,
+        "score": 75.0,
+        "overall_status": "FAIL"
+    },
+    "violations": [
+        {
+            "rule_id": "LM005",
+            "field": "manufacture_date",
+            "status": "FAIL",
+            "value": "",
+            "message": "Date declaration is missing."
+        },
+        {
+            "rule_id": "LM007",
+            "field": "mrp",
+            "status": "FAIL",
+            "value": "",
+            "message": "MRP is missing."
+        }
+    ],
+    "rule_results": [
+        {
+            "rule_id": "LM001",
+            "field": "manufacturer",
+            "status": "PASS",
+            "value": "Tata Consumer Products",
+            "message": "Required declaration is present."
+        },
+        {
+            "rule_id": "LM002",
+            "field": "country_of_origin",
+            "status": "NOT_APPLICABLE",
+            "value": "India",
+            "message": "Country of origin rule is not applicable because the product is not identified as imported."
+        },
+        {
+            "rule_id": "LM003",
+            "field": "product_name",
+            "status": "PASS",
+            "value": "Tata Salt",
+            "message": "Required declaration is present."
+        },
+        {
+            "rule_id": "LM004",
+            "field": "net_quantity",
+            "status": "PASS",
+            "value": "1 kg",
+            "message": "Net quantity has a recognizable number and unit."
+        },
+        {
+            "rule_id": "LM005",
+            "field": "manufacture_date",
+            "status": "FAIL",
+            "value": "",
+            "message": "Date declaration is missing."
+        },
+        {
+            "rule_id": "LM006",
+            "field": "best_before",
+            "status": "PASS",
+            "value": "12 months from manufacture",
+            "message": "Shelf-life declaration is recognizable."
+        },
+        {
+            "rule_id": "LM007",
+            "field": "mrp",
+            "status": "FAIL",
+            "value": "",
+            "message": "MRP is missing."
+        },
+        {
+            "rule_id": "LM008",
+            "field": "consumer_care",
+            "status": "PASS",
+            "value": "1800-123-4567",
+            "message": "Recognizable consumer-care contact information is present."
+        },
+        {
+            "rule_id": "LM009",
+            "field": "unit_sale_price",
+            "status": "PASS",
+            "value": "₹30 per kg",
+            "message": "Unit sale price contains an interpretable price and unit."
+        }
+    ]
+}
