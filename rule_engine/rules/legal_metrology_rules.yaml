@@ -1,0 +1,255 @@
+version: "1.0"
+rule_set: "Legal Metrology (Packaged Commodities) Rules, 2011"
+
+rules:
+
+  - rule_id: "LM001"
+    field: "manufacturer"
+    legal_provision: "Rule 6(1)(a)"
+
+    requirement:
+      description: >
+        The package must declare the applicable name and address
+        information of the manufacturer, packer or importer.
+
+    applicability:
+      type: "conditional"
+      condition: "manufacturer_packer_importer_status"
+
+    validation:
+      type: "conditional_required"
+
+    result_states:
+      pass: "Required applicable declaration is detected."
+      fail: "Required applicable declaration is missing."
+      review: "OCR result is uncertain or incomplete."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(1)(a)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM002"
+    field: "country_of_origin"
+    legal_provision: "Rule 6(1)(aa)"
+
+    requirement:
+      description: >
+        The country of origin, manufacture or assembly must be
+        mentioned in case of imported products.
+
+    applicability:
+      type: "conditional"
+      condition: "product_is_imported"
+
+    validation:
+      type: "conditional_required"
+
+    result_states:
+      pass: "Country of origin is detected."
+      fail: "Country of origin is missing for an imported product."
+      not_applicable: "Product is not identified as imported."
+      review: "Import status or OCR result is uncertain."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(1)(aa)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM003"
+    field: "product_name"
+    legal_provision: "Rule 6(1)(b)"
+
+    requirement:
+      description: >
+        The common or generic name of the commodity contained
+        in the package must be mentioned.
+
+    applicability:
+      type: "general"
+
+    validation:
+      type: "required"
+
+    result_states:
+      pass: "Common or generic product name is detected."
+      fail: "Required product name is missing."
+      review: "Only a brand name or uncertain text is detected."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(1)(b)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM004"
+    field: "net_quantity"
+    legal_provision: "Rule 6(1)(c)"
+
+    requirement:
+      description: >
+        The net quantity must be stated in the applicable standard
+        unit of weight or measure, or by number where applicable.
+
+    applicability:
+      type: "general"
+
+    validation:
+      type: "required_with_unit"
+
+    result_states:
+      pass: "Net quantity and an appropriate unit/number declaration are detected."
+      fail: "Required net quantity declaration is missing or invalid."
+      review: "Quantity or unit could not be reliably interpreted."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(1)(c)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM005"
+    field: "manufacture_date"
+    legal_provision: "Rule 6(1)(d)"
+
+    requirement:
+      description: >
+        The applicable manufacture month and year declaration
+        must be present, subject to the conditions and exceptions
+        specified in the Rules.
+
+    applicability:
+      type: "conditional"
+      condition: "rule_6_1_d_applies"
+
+    validation:
+      type: "conditional_required_date"
+
+    result_states:
+      pass: "Applicable manufacture date is detected."
+      fail: "Applicable manufacture date is missing."
+      review: "Applicability or date interpretation is uncertain."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(1)(d)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM006"
+    field: "best_before"
+    legal_provision: "Rule 6(1)(da)"
+
+    requirement:
+      description: >
+        Where applicable, the best-before or use-by declaration
+        must be mentioned for commodities that may become unfit
+        for human consumption after a period.
+
+    applicability:
+      type: "conditional"
+      condition: "commodity_has_applicable_shelf_life_requirement"
+
+    validation:
+      type: "conditional_required_date"
+
+    result_states:
+      pass: "Applicable best-before/use-by declaration is detected."
+      fail: "Applicable declaration is missing."
+      review: "Product applicability or date interpretation is uncertain."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(1)(da)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM007"
+    field: "mrp"
+    legal_provision: "Rule 6(1)(e)"
+
+    requirement:
+      description: >
+        The retail sale price must be declared as required by
+        the Rules, including the applicable maximum retail price
+        and tax wording.
+
+    applicability:
+      type: "general"
+
+    validation:
+      type: "required_currency"
+
+    result_states:
+      pass: "MRP is detected in an interpretable form."
+      fail: "Required MRP declaration is missing."
+      review: "MRP text or amount is unclear."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(1)(e)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM008"
+    field: "consumer_care"
+    legal_provision: "Rule 6(2)"
+
+    requirement:
+      description: >
+        The package must provide the applicable consumer complaint
+        contact information, including the prescribed contact details.
+
+    applicability:
+      type: "general"
+
+    validation:
+      type: "required_contact"
+
+    result_states:
+      pass: "Required consumer-care contact information is detected."
+      fail: "Required consumer-care information is missing."
+      review: "Contact information is incomplete or uncertain."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(2)"
+
+    status: "prototype"
+
+
+  - rule_id: "LM009"
+    field: "unit_sale_price"
+    legal_provision: "Rule 6(11)"
+
+    requirement:
+      description: >
+        Where Rule 6(11) applies, the unit sale price must be
+        declared in the applicable prescribed unit and format.
+
+    applicability:
+      type: "conditional"
+      condition: "rule_6_11_applies"
+
+    validation:
+      type: "conditional_unit_price"
+
+    result_states:
+      pass: "Applicable unit sale price is detected and interpretable."
+      fail: "Applicable unit sale price is missing."
+      review: "Quantity, unit or unit-price interpretation is uncertain."
+
+    source:
+      document: "Legal Metrology (Packaged Commodities) Rules, 2011"
+      source_location: "Rule 6(11)"
+
+    status: "prototype"
