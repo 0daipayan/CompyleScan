@@ -10,9 +10,8 @@ import {
   Platform,
 } from 'react-native';
 import { Container, Text, AppButton } from 'react-native-basic-elements';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import ImagePicker from 'react-native-image-crop-picker';
 import { moderateScale } from '../../Constants/PixelRatio';
+import ImagePicker from 'react-native-image-crop-picker';
 
 const ImageCapture = ({ navigation }) => {
   const [images, setImages] = useState({
@@ -111,7 +110,11 @@ const ImageCapture = ({ navigation }) => {
         style={styles.dashedCard}
         onPress={() => captureImage(slotKey)}
       >
-        <Icon name="camera-plus-outline" size={moderateScale(24)} color="#64748B" />
+        <Image 
+          source={require('../../Assets/camera.png')} 
+          style={styles.slotIcon} 
+          resizeMode="contain" 
+        />
         <Text style={styles.dashedText}>{title}</Text>
       </TouchableOpacity>
     );
@@ -139,7 +142,11 @@ const ImageCapture = ({ navigation }) => {
           style={styles.cameraBtn}
           onPress={handleOpenGeneralCamera}
         >
-          <Icon name="camera-outline" size={moderateScale(20)} color="#0D9488" style={{ marginRight: 8 }} />
+          <Image 
+            source={require('../../Assets/camera.png')} 
+            style={styles.btnIcon} 
+            resizeMode="contain" 
+          />
           <Text style={styles.cameraBtnText}>Open camera</Text>
         </TouchableOpacity>
 
@@ -202,6 +209,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: moderateScale(12),
   },
+  slotIcon: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    tintColor: '#64748B',
+  },
   dashedText: { fontSize: moderateScale(12), color: '#64748B', marginTop: moderateScale(8) },
   cameraBtn: {
     backgroundColor: '#E6F4F1',
@@ -211,6 +223,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: moderateScale(12),
+  },
+  btnIcon: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+    tintColor: '#0D9488',
+    marginRight: moderateScale(8),
   },
   cameraBtnText: { color: '#0D9488', fontSize: moderateScale(15), fontWeight: '600' },
   submitBtn: { backgroundColor: '#0F172A', borderRadius: moderateScale(12), height: moderateScale(52), justifyContent: 'center' },

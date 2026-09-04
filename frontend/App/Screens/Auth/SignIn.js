@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Image } from 'react-native';
 import { AppButton, AppTextInput, Container, Text } from 'react-native-basic-elements';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { moderateScale } from '../../Constants/PixelRatio';
 import { useDispatch } from 'react-redux';
 import { setUser } from '../../Redux/reducer/User';
@@ -45,7 +44,11 @@ const SignIn = ({ navigation }) => {
       <View style={styles.contentContainer}>
         {/* Header Icon */}
         <View style={styles.iconBadge}>
-          <Icon name="checkbox-marked-circle-outline" size={moderateScale(32)} color="#0F172A" />
+          <Image
+            source={require('../../Assets/sign-in.png')}
+            style={styles.headerIcon}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Header Titles */}
@@ -54,12 +57,17 @@ const SignIn = ({ navigation }) => {
 
         {/* Form Container */}
         <View style={styles.formContainer}>
-          <RoleSelector selectedRole={role} onSelectRole={(newRole) => {
-            setRole(newRole);
-            setErrors({});
-          }} />
+          <RoleSelector
+            selectedRole={role}
+            onSelectRole={(newRole) => {
+              setRole(newRole);
+              setErrors({});
+            }}
+          />
 
-          <Text style={styles.inputLabel}>{role === 'Inspector' ? 'Inspector ID' : 'Officer ID'}</Text>
+          <Text style={styles.inputLabel}>
+            {role === 'Inspector' ? 'Inspector ID' : 'Officer ID'}
+          </Text>
           <AppTextInput
             value={officerId}
             onChangeText={(text) => {
@@ -102,8 +110,8 @@ const SignIn = ({ navigation }) => {
         </View>
 
         {/* Link to Registration */}
-        <TouchableOpacity 
-          style={styles.registerLink} 
+        <TouchableOpacity
+          style={styles.registerLink}
           onPress={() => navigation.navigate('SignUp')}
         >
           <Text style={styles.registerLinkText}>
@@ -113,7 +121,11 @@ const SignIn = ({ navigation }) => {
 
         {/* Footer Note */}
         <View style={styles.footerContainer}>
-          <Icon name="lock-outline" size={moderateScale(14)} color="#64748B" />
+          <Image
+            source={require('../../Assets/padlock.png')}
+            style={styles.lockIcon}
+            resizeMode="contain"
+          />
           <Text style={styles.footerText}> Secured · role-based access</Text>
         </View>
       </View>
@@ -142,6 +154,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: moderateScale(16),
+  },
+  headerIcon: {
+    width: moderateScale(28),
+    height: moderateScale(28),
+    tintColor: '#0F172A',
   },
   mainTitle: {
     fontSize: moderateScale(22),
@@ -212,6 +229,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: moderateScale(24),
+  },
+  lockIcon: {
+    width: moderateScale(14),
+    height: moderateScale(14),
+    tintColor: '#64748B',
   },
   footerText: {
     fontSize: moderateScale(12),

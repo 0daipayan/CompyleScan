@@ -1,7 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Container, Text } from 'react-native-basic-elements';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { moderateScale } from '../../Constants/PixelRatio';
 
 const ReportViewer = ({ navigation }) => {
@@ -9,8 +8,7 @@ const ReportViewer = ({ navigation }) => {
     <Container style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={moderateScale(18)} color="#0F172A" />
-          <Text style={styles.backText}>Back to result</Text>
+          <Text style={styles.backText}>← Back to result</Text>
         </TouchableOpacity>
 
         {/* Document Sheet */}
@@ -37,20 +35,56 @@ const ReportViewer = ({ navigation }) => {
           </View>
 
           <Text style={[styles.sectionHeader, { marginTop: moderateScale(16) }]}>RULE-BY-RULE FINDINGS</Text>
-          <View style={styles.findingRow}><Icon name="check" size={16} color="#16A34A" /><Text style={styles.findingText}>MRP present & valid</Text></View>
-          <View style={styles.findingRow}><Icon name="check" size={16} color="#16A34A" /><Text style={styles.findingText}>Net quantity valid</Text></View>
-          <View style={styles.findingRow}><Icon name="close" size={16} color="#DC2626" /><Text style={[styles.findingText, { color: '#DC2626' }]}>Manufacture date missing</Text></View>
-          <View style={styles.findingRow}><Icon name="check" size={16} color="#16A34A" /><Text style={styles.findingText}>Consumer care present</Text></View>
+          <View style={styles.findingRow}>
+            <Image 
+              source={require('../../Assets/verified.png')} 
+              style={[styles.findingIcon, { tintColor: '#16A34A' }]} 
+              resizeMode="contain" 
+            />
+            <Text style={styles.findingText}>MRP present & valid</Text>
+          </View>
+          <View style={styles.findingRow}>
+            <Image 
+              source={require('../../Assets/verified.png')} 
+              style={[styles.findingIcon, { tintColor: '#16A34A' }]} 
+              resizeMode="contain" 
+            />
+            <Text style={styles.findingText}>Net quantity valid</Text>
+          </View>
+          <View style={styles.findingRow}>
+            <Image 
+              source={require('../../Assets/verified.png')} 
+              style={[styles.findingIcon, { tintColor: '#DC2626' }]} 
+              resizeMode="contain" 
+            />
+            <Text style={[styles.findingText, { color: '#DC2626' }]}>Manufacture date missing</Text>
+          </View>
+          <View style={styles.findingRow}>
+            <Image 
+              source={require('../../Assets/verified.png')} 
+              style={[styles.findingIcon, { tintColor: '#16A34A' }]} 
+              resizeMode="contain" 
+            />
+            <Text style={styles.findingText}>Consumer care present</Text>
+          </View>
         </View>
 
         {/* Footer Actions */}
         <View style={styles.footerRow}>
           <TouchableOpacity style={styles.downloadBtn}>
-            <Icon name="download-outline" size={18} color="#0F172A" />
+            <Image 
+              source={require('../../Assets/download.png')} 
+              style={[styles.actionIcon, { tintColor: '#0F172A' }]} 
+              resizeMode="contain" 
+            />
             <Text style={styles.btnLabel}>Download PDF</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.shareBtn}>
-            <Icon name="share-variant-outline" size={18} color="#FFFFFF" />
+            <Image 
+              source={require('../../Assets/share.png')} 
+              style={[styles.actionIcon, { tintColor: '#FFFFFF' }]} 
+              resizeMode="contain" 
+            />
             <Text style={[styles.btnLabel, { color: '#FFFFFF' }]}>Share</Text>
           </TouchableOpacity>
         </View>
@@ -65,7 +99,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   scrollContent: { paddingHorizontal: moderateScale(20), paddingTop: moderateScale(40), paddingBottom: moderateScale(20) },
   backRow: { flexDirection: 'row', alignItems: 'center', marginBottom: moderateScale(16) },
-  backText: { marginLeft: moderateScale(8), fontSize: moderateScale(14), fontWeight: '500', color: '#0F172A' },
+  backText: { fontSize: moderateScale(14), fontWeight: '500', color: '#0F172A' },
   docCard: { backgroundColor: '#FFFFFF', borderRadius: moderateScale(12), padding: moderateScale(16), borderWidth: 1, borderColor: '#E2E8F0', marginBottom: moderateScale(20) },
   docHeader: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#0F172A', paddingBottom: moderateScale(12), marginBottom: moderateScale(16) },
   docType: { fontSize: moderateScale(10), fontWeight: '700', color: '#64748B' },
@@ -80,9 +114,11 @@ const styles = StyleSheet.create({
   imageGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   imgPlaceholder: { width: '48%', height: moderateScale(80), backgroundColor: '#F1F5F9', borderRadius: moderateScale(8) },
   findingRow: { flexDirection: 'row', alignItems: 'center', marginVertical: moderateScale(4) },
+  findingIcon: { width: moderateScale(16), height: moderateScale(16) },
   findingText: { fontSize: moderateScale(12), color: '#334155', marginLeft: moderateScale(6) },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between' },
   downloadBtn: { flex: 0.48, height: moderateScale(48), borderRadius: moderateScale(10), borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   shareBtn: { flex: 0.48, height: moderateScale(48), borderRadius: moderateScale(10), backgroundColor: '#0F172A', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  actionIcon: { width: moderateScale(18), height: moderateScale(18) },
   btnLabel: { marginLeft: moderateScale(6), fontSize: moderateScale(13), fontWeight: '600', color: '#0F172A' },
 });
