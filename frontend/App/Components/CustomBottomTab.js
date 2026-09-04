@@ -1,24 +1,23 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { StyleSheet, View, Text, TouchableOpacity, Image } from 'react-native';
 import { moderateScale } from '../Constants/PixelRatio';
 
 const CustomBottomTab = ({ state, descriptors, navigation }) => {
-  const getIconName = (routeName) => {
+  const getIconSource = (routeName) => {
     switch (routeName) {
       case 'Home':
       case 'Overview':
-        return 'home-outline';
+        return require('../Assets/home.png');
       case 'New scan':
-        return 'barcode-scan';
+        return require('../Assets/scanner.png');
       case 'Review queue':
-        return 'clipboard-check-outline';
+        return require('../Assets/report.png');
       case 'History':
-        return 'history';
+        return require('../Assets/review.png');
       case 'Profile':
-        return 'account-outline';
+        return require('../Assets/profile.png');
       default:
-        return 'circle-outline';
+        return require('../Assets/home.png');
     }
   };
 
@@ -48,10 +47,13 @@ const CustomBottomTab = ({ state, descriptors, navigation }) => {
             activeOpacity={0.7}
             style={styles.tabButton}
           >
-            <Icon
-              name={getIconName(route.name)}
-              size={moderateScale(20)}
-              color={isFocused ? '#0F172A' : '#94A3B8'}
+            <Image
+              source={getIconSource(route.name)}
+              style={[
+                styles.icon,
+                { tintColor: isFocused ? '#0F172A' : '#94A3B8' },
+              ]}
+              resizeMode="contain"
             />
             <Text style={[styles.tabLabel, isFocused ? styles.labelActive : styles.labelInactive]}>
               {label}
@@ -80,9 +82,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
   },
+  icon: {
+    width: moderateScale(22),
+    height: moderateScale(22),
+  },
   tabLabel: {
     fontSize: moderateScale(11),
-    marginTop: moderateScale(2),
+    marginTop: moderateScale(4),
   },
   labelActive: {
     color: '#0F172A',

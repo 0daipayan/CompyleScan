@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Container, Text } from 'react-native-basic-elements';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { moderateScale } from '../../Constants/PixelRatio';
 
 const ResultReview = ({ navigation }) => {
@@ -55,15 +54,27 @@ const ResultReview = ({ navigation }) => {
         <Text style={styles.sectionHeader}>RULE RESULTS</Text>
         <View style={styles.card}>
           <View style={styles.ruleRow}>
-            <Icon name="check" size={moderateScale(16)} color="#16A34A" />
+            <Image 
+              source={require('../../Assets/verified.png')} 
+              style={[styles.statusIcon, { tintColor: '#16A34A' }]} 
+              resizeMode="contain" 
+            />
             <Text style={styles.ruleText}>MRP declaration present and valid</Text>
           </View>
           <View style={styles.ruleRow}>
-            <Icon name="check" size={moderateScale(16)} color="#16A34A" />
+            <Image 
+              source={require('../../Assets/verified.png')} 
+              style={[styles.statusIcon, { tintColor: '#16A34A' }]} 
+              resizeMode="contain" 
+            />
             <Text style={styles.ruleText}>Net quantity format valid</Text>
           </View>
           <View style={styles.ruleRow}>
-            <Icon name="close" size={moderateScale(16)} color="#DC2626" />
+            <Image 
+              source={require('../../Assets/verified.png')} 
+              style={[styles.statusIcon, { tintColor: '#DC2626' }]} 
+              resizeMode="contain" 
+            />
             <Text style={[styles.ruleText, { color: '#DC2626' }]}>
               Manufacture date not found — needs manual check
             </Text>
@@ -91,11 +102,13 @@ const ResultReview = ({ navigation }) => {
           disabled={!isConfirmed}
           onPress={() => navigation.navigate('ReportViewer')}
         >
-          <Icon
-            name="file-document-outline"
-            size={moderateScale(18)}
-            color={isConfirmed ? '#0D9488' : '#94A3B8'}
-            style={{ marginRight: 6 }}
+          <Image
+            source={require('../../Assets/eye.png')}
+            style={[
+              styles.btnIcon,
+              { tintColor: isConfirmed ? '#0D9488' : '#94A3B8' }
+            ]}
+            resizeMode="contain"
           />
           <Text style={[styles.reportBtnText, !isConfirmed && styles.disabledReportBtnText]}>
             View full report
@@ -162,6 +175,7 @@ const styles = StyleSheet.create({
   fieldKey: { fontSize: moderateScale(13), color: '#64748B' },
   fieldVal: { fontSize: moderateScale(13), fontWeight: '600', color: '#0F172A' },
   ruleRow: { flexDirection: 'row', alignItems: 'center', marginVertical: moderateScale(6) },
+  statusIcon: { width: moderateScale(16), height: moderateScale(16) },
   ruleText: { fontSize: moderateScale(12), color: '#334155', marginLeft: moderateScale(8), flex: 1 },
   actionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: moderateScale(12) },
   overrideBtn: {
@@ -194,6 +208,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  btnIcon: {
+    width: moderateScale(18),
+    height: moderateScale(18),
+    marginRight: moderateScale(6),
   },
   reportBtnText: { color: '#0D9488', fontSize: moderateScale(14), fontWeight: '600' },
   disabledReportBtn: {
