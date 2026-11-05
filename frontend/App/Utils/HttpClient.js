@@ -1,265 +1,1022 @@
-import Storage from './Storage'
+import Storage from './Storage';
 import { MAIN_BASE_URL } from './EnvVariables';
 // import RNFetchBlob from 'rn-fetch-blob';
-import RNFS from 'react-native-fs'
+import RNFS from 'react-native-fs';
 
-const BASE_URL = `${MAIN_BASE_URL}/v1/api`;
+const BASE_URL = MAIN_BASE_URL;
 
+
+// ============================================================
+// GET TOKEN
+// ============================================================
 
 async function getToken() {
     return await Storage.get('token');
 }
+
+
+// ============================================================
+// BASIC HTTP METHODS
+// ============================================================
 
 function get(endpoint, params) {
     return request(endpoint, params);
 }
 
 function post(endpoint, params) {
-    return request(endpoint, params, "POST");
+    return request(endpoint, params, 'POST');
 }
 
 function put(endpoint, params) {
-    return request(endpoint, params, "PUT");
+    return request(endpoint, params, 'PUT');
 }
 
 function Delete(endpoint, params) {
-    return request(endpoint, params, "DELETE");
+    return request(endpoint, params, 'DELETE');
 }
 
-async function request(endpoint, params = null, method = 'GET') {
-    let token = await getToken();
 
-    var xmlRequest = new XMLHttpRequest();
-    let url = BASE_URL + endpoint;
+// ============================================================
+// COMMON REQUEST
+// ============================================================
+
+async function request(endpoint, params = null, method = 'GET') {
+
+    const token = await getToken();
+
+    const xmlRequest = new XMLHttpRequest();
+
+    const url = BASE_URL + endpoint;
+
+    console.log('HTTP Request:', method, url);
 
     return new Promise((resolve, reject) => {
+
         xmlRequest.open(method, url, true);
 
         xmlRequest.setRequestHeader('Accept', '*/*');
         xmlRequest.setRequestHeader('Content-Type', 'application/json');
-        xmlRequest.setRequestHeader('Authorization', token);
 
-        if (method == 'GET') {
+        // IMPORTANT:
+        // Backend expects:
+        // Authorization: Bearer <token>
+        if (token) {
+            xmlRequest.setRequestHeader(
+                'Authorization',
+                `Bearer ${token}`
+            );
+        }
+
+        if (method === 'GET') {
             xmlRequest.send();
         } else {
             xmlRequest.send(JSON.stringify(params));
         }
 
-        xmlRequest.onreadystatechange = function () { // Call a function when the state changes.   
-            // console.log("xmlRequest.response",xmlRequest.response)  
+        xmlRequest.onreadystatechange = function () {
+
             if (xmlRequest.readyState === XMLHttpRequest.DONE) {
-                if (xmlRequest.status === 200) {
-                    resolve(JSON.parse(xmlRequest.response));
-                } else {
+
+                console.log(
+                    'HTTP Status:',
+                    xmlRequest.status
+                );
+
+                console.log(
+                    'HTTP Response:',
+                    xmlRequest.responseText
+                );
+
+                if (
+                    xmlRequest.status >= 200 &&
+                    xmlRequest.status < 300
+                ) {
+
                     try {
-                        reject(JSON.parse(xmlRequest.response));
+
+                        resolve(
+                            JSON.parse(xmlRequest.responseText)
+                        );
+
                     } catch (err) {
-                        reject({ error: 'Server Error Please try again later !!!', actError: err });
+
+                        resolve(
+                            xmlRequest.responseText
+                        );
                     }
+
+                } else {
+
+                    try {
+
+                        reject(
+                            JSON.parse(xmlRequest.responseText)
+                        );
+
+                    } catch (err) {
+
+                        reject({
+                            error:
+                                'Server Error Please try again later !!!',
+                            status: xmlRequest.status,
+                            actError: err,
+                        });
+
+                    }
+
                 }
+
             }
-        }
-    })
 
-}
-
-const FileUpload = async (url, file, object_get = {}) => {
-    return new Promise(async function (resolve, reject) {
-        let token = await getToken();
-        let apiUrl = BASE_URL + url;
-
-        console.log("apiUrl", apiUrl)
-
-        var data = new FormData();
-
-        let objArray = Object.keys(object_get);
-
-        objArray.forEach((element) => {
-            data.append(element, object_get[element]);
-        });
-
-        if (file.path != '') {
-            let get_originalname = await getOriginalname(file.path);
-            console.log('originalnam', get_originalname);
-
-            data.append('video', {
-                uri: file.path,
-                type: file.mime,
-                name: get_originalname,
-            });
-        }
-        var xhr = new XMLHttpRequest();
-        xhr.withCredentials = true;
-        xhr.onreadystatechange = function () {
-            console.log("xhr.response", xhr.response)
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                resolve(JSON.parse(xhr.response));
-            }
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 400) {
-                resolve(JSON.parse(xhr.response));
-            } else if (xhr.status == 0 && xhr.readyState === XMLHttpRequest.DONE) {
-                reject('notupload')
-            }
         };
 
-        xhr.open('POST', apiUrl);
-        xhr.setRequestHeader('Content-Type', 'multipart/form-data');
-        xhr.setRequestHeader('cache-control', 'no-cache');
-        xhr.setRequestHeader('Authorization', token);
+        xmlRequest.onerror = function () {
 
-        xhr.send(data);
-    });
-}
-
-const newFileUpload = async (url, file, object_get = {}) => {
-    let token = await getToken();
-    return new Promise(async function (resolve, reject) {
-        let apiUrl = BASE_URL + url;
-
-        console.log("apiUrl", apiUrl)
-
-        var data = new FormData();
-
-        let objArray = Object.keys(object_get);
-
-        objArray.forEach((element) => {
-            data.append(element, object_get[element]);
-        });
-
-        if (file.path != '') {
-            let get_originalname = await getOriginalname(file.path);
-            console.log('originalname', get_originalname);
-            data.append('image', {
-                uri: file.path,
-                type: file.mime,
-                name: get_originalname,
-
+            reject({
+                error: 'Network error',
+                message: 'Could not connect to backend.',
             });
-        }
-        var xhr = new XMLHttpRequest();
-        xhr.withCredentials = true;
-        xhr.onreadystatechange = function () {
-            console.log("xhr.response", xhr.response)
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                resolve(JSON.parse(xhr.response));
-            }
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 400) {
-                resolve(JSON.parse(xhr.response));
-            }
-            else if (xhr.status == 0 && xhr.readyState === XMLHttpRequest.DONE) {
-                reject('notupload')
-            }
+
         };
 
-        xhr.open('POST', apiUrl);
-        xhr.setRequestHeader('Accept', '/');
-        xhr.setRequestHeader('Content-Type', 'multipart/form-data');
-        xhr.setRequestHeader('cache-control', 'no-cache');
-        xhr.setRequestHeader('Authorization', token);
-        xhr.send(data);
     });
-}
 
-const musicFileUpload = async (url, file, object_get = {}) => {
-    let token = await getToken();
-    let apiUrl = BASE_URL + url;
-
-    console.log("apiUrl", apiUrl, url)
-
-    let Base64Image = await RNFS.readFile(file.abPath, 'base64')
-    return new Promise((resolve, reject) => {
-        // console.log("`data:${file.type};base64,${Base64Image}`", `data:${file.type};base64,${Base64Image}`)
-        RNFetchBlob.fetch('POST', apiUrl, {
-            "Accept": '/',
-            'Content-Type': 'application/octet-stream',
-            'cache-control': 'no-cache',
-            'Authorization': token,
-            'originalname': file.name,
-            'minetype': `${file.type}`,
-            'replacetype': `data${file.type}base64`
-        }, `data:${file.type};base64,${Base64Image}`)
-            .then((result) => {
-                try {
-                    console.log("JSON.parse(result.data)", JSON.parse(result.data))
-                    resolve(JSON.parse(result.data));
-                } catch (error) {
-                    console.log("error", error)
-                    reject(error);
-                }
-            })
-            .catch((error) => {
-                console.log("error", error)
-
-                reject(error);
-            })
-    })
 }
 
 
-async function multiupload(endpoint, method, files = [], object_get = {}) {
-    let token = await getToken();
+// ============================================================
+// FILE UPLOAD
+// ============================================================
 
-    var xmlRequest = new XMLHttpRequest();
-    let url = BASE_URL + endpoint;
+const FileUpload = async (
+    url,
+    file,
+    object_get = {}
+) => {
 
-    var data = new FormData();
+    return new Promise(async function (resolve, reject) {
 
-    let objArray = Object.keys(object_get);
-    objArray.forEach((element) => {
-        data.append(element, object_get[element]);
-    });
+        try {
 
-    files.forEach(async (element) => {
-        let get_originalname = await getOriginalname(element.path);
-        data.append(element.key, {
-            uri: element.path,
-            type: felementile.mime,
-            name: get_originalname,
-        });
-    })
+            const token = await getToken();
 
-    return new Promise((resolve, reject) => {
-        xmlRequest.open(method, url, true);
+            const apiUrl = BASE_URL + url;
 
-        xmlRequest.setRequestHeader('Accept', '/');
-        xmlRequest.setRequestHeader('Content-Type', 'multipart/form-data');
-        xmlRequest.setRequestHeader('cache-control', 'no-cache');
-        xmlRequest.setRequestHeader('Authorization', token);
+            console.log('File Upload URL:', apiUrl);
 
-        xmlRequest.send(data);
+            const data = new FormData();
 
-        xmlRequest.onreadystatechange = function () { // Call a function when the state changes.   
-            if (xmlRequest.readyState === XMLHttpRequest.DONE) {
-                if (xmlRequest.status === 200) {
-                    resolve(JSON.parse(xmlRequest.response));
-                } else {
-                    try {
-                        reject(JSON.parse(xmlRequest.response));
-                    } catch (err) {
-                        reject({ error: 'Server Error Please try again later !!!', actError: err });
-                    }
-                }
+            const objArray = Object.keys(object_get);
+
+            objArray.forEach((element) => {
+
+                data.append(
+                    element,
+                    object_get[element]
+                );
+
+            });
+
+            if (file && file.path !== '') {
+
+                const originalName =
+                    await getOriginalname(file.path);
+
+                console.log(
+                    'Original name:',
+                    originalName
+                );
+
+                data.append('video', {
+                    uri: file.path,
+                    type: file.mime || 'video/mp4',
+                    name: originalName,
+                });
+
             }
+
+            const xhr = new XMLHttpRequest();
+
+            xhr.withCredentials = true;
+
+            xhr.onreadystatechange = function () {
+
+                console.log(
+                    'File upload response:',
+                    xhr.response
+                );
+
+                if (
+                    xhr.readyState === XMLHttpRequest.DONE
+                ) {
+
+                    if (
+                        xhr.status >= 200 &&
+                        xhr.status < 300
+                    ) {
+
+                        try {
+
+                            resolve(
+                                JSON.parse(xhr.response)
+                            );
+
+                        } catch (error) {
+
+                            resolve(xhr.response);
+
+                        }
+
+                    } else {
+
+                        try {
+
+                            reject(
+                                JSON.parse(xhr.response)
+                            );
+
+                        } catch (error) {
+
+                            reject({
+                                error: 'File upload failed',
+                                status: xhr.status,
+                                response: xhr.response,
+                            });
+
+                        }
+
+                    }
+
+                }
+
+            };
+
+            xhr.onerror = function () {
+
+                reject({
+                    error: 'Network error',
+                    message: 'Could not connect to backend.',
+                });
+
+            };
+
+            xhr.open('POST', apiUrl, true);
+
+            xhr.setRequestHeader(
+                'Content-Type',
+                'multipart/form-data'
+            );
+
+            xhr.setRequestHeader(
+                'cache-control',
+                'no-cache'
+            );
+
+            // IMPORTANT:
+            // Send Bearer token
+            if (token) {
+
+                xhr.setRequestHeader(
+                    'Authorization',
+                    `Bearer ${token}`
+                );
+
+            }
+
+            xhr.send(data);
+
+        } catch (error) {
+
+            reject(error);
+
         }
-    })
-}
+
+    });
+
+};
+
+
+// ============================================================
+// NEW FILE UPLOAD
+// ============================================================
+
+const newFileUpload = async (
+    url,
+    file,
+    object_get = {}
+) => {
+
+    return new Promise(async function (resolve, reject) {
+
+        try {
+
+            const token = await getToken();
+
+            const apiUrl = BASE_URL + url;
+
+            console.log(
+                'New File Upload URL:',
+                apiUrl
+            );
+
+            const data = new FormData();
+
+            Object.keys(object_get).forEach((element) => {
+
+                data.append(
+                    element,
+                    object_get[element]
+                );
+
+            });
+
+            if (file && file.path) {
+
+                const originalName =
+                    await getOriginalname(file.path);
+
+                data.append('file', {
+                    uri: file.path,
+                    type: file.mime || 'application/octet-stream',
+                    name: originalName,
+                });
+
+            }
+
+            const xhr = new XMLHttpRequest();
+
+            xhr.onreadystatechange = function () {
+
+                if (
+                    xhr.readyState === XMLHttpRequest.DONE
+                ) {
+
+                    console.log(
+                        'New file upload status:',
+                        xhr.status
+                    );
+
+                    console.log(
+                        'New file upload response:',
+                        xhr.responseText
+                    );
+
+                    if (
+                        xhr.status >= 200 &&
+                        xhr.status < 300
+                    ) {
+
+                        try {
+
+                            resolve(
+                                JSON.parse(xhr.responseText)
+                            );
+
+                        } catch (error) {
+
+                            resolve(
+                                xhr.responseText
+                            );
+
+                        }
+
+                    } else {
+
+                        try {
+
+                            reject(
+                                JSON.parse(xhr.responseText)
+                            );
+
+                        } catch (error) {
+
+                            reject({
+                                error: 'File upload failed',
+                                status: xhr.status,
+                                response:
+                                    xhr.responseText,
+                            });
+
+                        }
+
+                    }
+
+                }
+
+            };
+
+            xhr.onerror = function () {
+
+                reject({
+                    error: 'Network error',
+                    message: 'Could not connect to backend.',
+                });
+
+            };
+
+            xhr.open('POST', apiUrl, true);
+
+            xhr.setRequestHeader(
+                'Accept',
+                'application/json'
+            );
+
+            xhr.setRequestHeader(
+                'cache-control',
+                'no-cache'
+            );
+
+            if (token) {
+
+                xhr.setRequestHeader(
+                    'Authorization',
+                    `Bearer ${token}`
+                );
+
+            }
+
+            xhr.send(data);
+
+        } catch (error) {
+
+            reject(error);
+
+        }
+
+    });
+
+};
+
+
+// ============================================================
+// MULTI UPLOAD
+// ============================================================
+
+const multiupload = async (
+    url,
+    files = [],
+    object_get = {}
+) => {
+
+    return new Promise(async (resolve, reject) => {
+
+        try {
+
+            const token = await getToken();
+
+            const apiUrl = BASE_URL + url;
+
+            console.log(
+                'Multi Upload URL:',
+                apiUrl
+            );
+
+            const data = new FormData();
+
+            Object.keys(object_get).forEach((key) => {
+
+                data.append(
+                    key,
+                    object_get[key]
+                );
+
+            });
+
+            for (const file of files) {
+
+                if (file && file.path) {
+
+                    const originalName =
+                        await getOriginalname(file.path);
+
+                    data.append('files', {
+                        uri: file.path,
+                        type:
+                            file.mime ||
+                            'application/octet-stream',
+                        name: originalName,
+                    });
+
+                }
+
+            }
+
+            const xhr = new XMLHttpRequest();
+
+            xhr.onreadystatechange = function () {
+
+                if (
+                    xhr.readyState === XMLHttpRequest.DONE
+                ) {
+
+                    console.log(
+                        'Multi upload status:',
+                        xhr.status
+                    );
+
+                    console.log(
+                        'Multi upload response:',
+                        xhr.responseText
+                    );
+
+                    if (
+                        xhr.status >= 200 &&
+                        xhr.status < 300
+                    ) {
+
+                        try {
+
+                            resolve(
+                                JSON.parse(
+                                    xhr.responseText
+                                )
+                            );
+
+                        } catch (error) {
+
+                            resolve(
+                                xhr.responseText
+                            );
+
+                        }
+
+                    } else {
+
+                        try {
+
+                            reject(
+                                JSON.parse(
+                                    xhr.responseText
+                                )
+                            );
+
+                        } catch (error) {
+
+                            reject({
+                                error: 'Upload failed',
+                                status: xhr.status,
+                                response:
+                                    xhr.responseText,
+                            });
+
+                        }
+
+                    }
+
+                }
+
+            };
+
+            xhr.onerror = function () {
+
+                reject({
+                    error: 'Network error',
+                    message: 'Could not connect to backend.',
+                });
+
+            };
+
+            xhr.open('POST', apiUrl, true);
+
+            xhr.setRequestHeader(
+                'Accept',
+                'application/json'
+            );
+
+            if (token) {
+
+                xhr.setRequestHeader(
+                    'Authorization',
+                    `Bearer ${token}`
+                );
+
+            }
+
+            xhr.send(data);
+
+        } catch (error) {
+
+            reject(error);
+
+        }
+
+    });
+
+};
+
+
+// ============================================================
+// MUSIC FILE UPLOAD
+// ============================================================
+
+const musicFileUpload = async (
+    url,
+    file,
+    object_get = {}
+) => {
+
+    return new Promise(async (resolve, reject) => {
+
+        try {
+
+            const token = await getToken();
+
+            const apiUrl = BASE_URL + url;
+
+            console.log(
+                'Music Upload URL:',
+                apiUrl
+            );
+
+            const data = new FormData();
+
+            Object.keys(object_get).forEach((key) => {
+
+                data.append(
+                    key,
+                    object_get[key]
+                );
+
+            });
+
+            if (file && file.path) {
+
+                const originalName =
+                    await getOriginalname(file.path);
+
+                data.append('music', {
+                    uri: file.path,
+                    type:
+                        file.mime ||
+                        'audio/mpeg',
+                    name: originalName,
+                });
+
+            }
+
+            const xhr = new XMLHttpRequest();
+
+            xhr.onreadystatechange = function () {
+
+                if (
+                    xhr.readyState === XMLHttpRequest.DONE
+                ) {
+
+                    console.log(
+                        'Music upload status:',
+                        xhr.status
+                    );
+
+                    console.log(
+                        'Music upload response:',
+                        xhr.responseText
+                    );
+
+                    if (
+                        xhr.status >= 200 &&
+                        xhr.status < 300
+                    ) {
+
+                        try {
+
+                            resolve(
+                                JSON.parse(
+                                    xhr.responseText
+                                )
+                            );
+
+                        } catch (error) {
+
+                            resolve(
+                                xhr.responseText
+                            );
+
+                        }
+
+                    } else {
+
+                        try {
+
+                            reject(
+                                JSON.parse(
+                                    xhr.responseText
+                                )
+                            );
+
+                        } catch (error) {
+
+                            reject({
+                                error:
+                                    'Music upload failed',
+                                status: xhr.status,
+                                response:
+                                    xhr.responseText,
+                            });
+
+                        }
+
+                    }
+
+                }
+
+            };
+
+            xhr.onerror = function () {
+
+                reject({
+                    error: 'Network error',
+                    message:
+                        'Could not connect to backend.',
+                });
+
+            };
+
+            xhr.open(
+                'POST',
+                apiUrl,
+                true
+            );
+
+            xhr.setRequestHeader(
+                'Accept',
+                'application/json'
+            );
+
+            if (token) {
+
+                xhr.setRequestHeader(
+                    'Authorization',
+                    `Bearer ${token}`
+                );
+
+            }
+
+            xhr.send(data);
+
+        } catch (error) {
+
+            reject(error);
+
+        }
+
+    });
+
+};
+
+
+// ============================================================
+// GET ORIGINAL FILE NAME
+// ============================================================
 
 async function getOriginalname(data) {
-    console.log("video", data);
-    let arr = data.split("/");
-    let lent = Number(arr.length - 1);
+
+    console.log('File path:', data);
+
+    const arr = data.split('/');
+
+    const lent = Number(arr.length - 1);
+
     return arr[lent];
+
 }
 
+
+// ============================================================
+// EVALUATE PACKAGE
+// ============================================================
+// This is the important function used by the inspection flow.
+// It sends the captured images using:
+//
+// packageImages
+//
+// and sends the JWT as:
+//
+// Authorization: Bearer <token>
+// ============================================================
+
+const evaluatePackage = async (
+    url,
+    files,
+    object_get = {}
+) => {
+
+    const token = await getToken();
+
+    const apiUrl = BASE_URL + url;
+
+    console.log(
+        'Evaluation API:',
+        apiUrl
+    );
+
+    console.log(
+        'Images:',
+        files
+    );
+
+    console.log(
+        'Token available:',
+        !!token
+    );
+
+    return new Promise(async (resolve, reject) => {
+
+        try {
+
+            const data = new FormData();
+
+
+            // Add normal form fields
+            Object.keys(object_get).forEach((key) => {
+
+                data.append(
+                    key,
+                    object_get[key]
+                );
+
+            });
+
+
+            // Add captured images
+            for (const file of files || []) {
+
+                if (file?.path) {
+
+                    const originalName =
+                        await getOriginalname(
+                            file.path
+                        );
+
+                    console.log(
+                        'Adding package image:',
+                        originalName
+                    );
+
+                    data.append(
+                        'packageImages',
+                        {
+                            uri: file.path,
+                            type:
+                                file.mime ||
+                                'image/jpeg',
+                            name: originalName,
+                        }
+                    );
+
+                }
+
+            }
+
+
+            const xhr =
+                new XMLHttpRequest();
+
+
+            xhr.onreadystatechange =
+                function () {
+
+                    if (
+                        xhr.readyState ===
+                        XMLHttpRequest.DONE
+                    ) {
+
+                        console.log(
+                            'Evaluation status:',
+                            xhr.status
+                        );
+
+                        console.log(
+                            'Evaluation response:',
+                            xhr.responseText
+                        );
+
+
+                        if (
+                            xhr.status >= 200 &&
+                            xhr.status < 300
+                        ) {
+
+                            try {
+
+                                resolve(
+                                    JSON.parse(
+                                        xhr.responseText
+                                    )
+                                );
+
+                            } catch (error) {
+
+                                reject({
+                                    error:
+                                        'Invalid server response',
+                                    response:
+                                        xhr.responseText,
+                                });
+
+                            }
+
+                        } else {
+
+                            try {
+
+                                reject(
+                                    JSON.parse(
+                                        xhr.responseText
+                                    )
+                                );
+
+                            } catch (error) {
+
+                                reject({
+                                    error:
+                                        'Server Error',
+                                    status:
+                                        xhr.status,
+                                    response:
+                                        xhr.responseText,
+                                });
+
+                            }
+
+                        }
+
+                    }
+
+                };
+
+
+            xhr.onerror = function () {
+
+                reject({
+                    error:
+                        'Network error',
+                    message:
+                        'Could not connect to backend.',
+                });
+
+            };
+
+
+            xhr.open(
+                'POST',
+                apiUrl,
+                true
+            );
+
+
+            xhr.setRequestHeader(
+                'Accept',
+                'application/json'
+            );
+
+
+            // IMPORTANT:
+            // Backend protect middleware expects
+            // "Bearer <JWT>"
+            if (token) {
+
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+            }
+
+
+            // DO NOT manually set Content-Type here.
+            //
+            // React Native will automatically generate:
+            // multipart/form-data; boundary=...
+            //
+            // This is important for FormData.
+            xhr.send(data);
+
+        } catch (error) {
+
+            reject(error);
+
+        }
+
+    });
+
+};
+
+
+// ============================================================
+// EXPORT
+// ============================================================
+
 const HttpClient = {
+
     get,
     post,
     put,
     Delete,
+
     multiupload,
     newFileUpload,
     FileUpload,
-    musicFileUpload
-}
+    musicFileUpload,
 
-export default HttpClient
+    evaluatePackage,
+
+};
+
+export default HttpClient;

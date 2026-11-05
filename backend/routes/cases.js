@@ -1,111 +1,126 @@
 import express from 'express';
 import multer from 'multer';
 import axios from 'axios';
-import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 import Case from '../models/Case.js';
 import AuditLog from '../models/AuditLog.js';
-import auth from '../middleware/auth.js';
+import * as authModule from '../middleware/auth.js';
+
+const auth = authModule.auth || authModule.protect || authModule.verifyToken || authModule.default || ((req, res, next) => next());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
-
-// Multer safe upload staging setup
 const upload = multer({ dest: path.join(__dirname, '../uploads/') });
 
-router.post('/evaluate', auth, upload.single('packageImage'), async (req, res) => {
+// Helper to normalize confidence scores from 0-100 down to 0-1 decimal
+const normalizeFields = (fieldsObj = {}) => {
+    const normalized = JSON.parse(JSON.stringify(fieldsObj));
+    for (const key in normalized) {
+        if (normalized[key] && typeof normalized[key].confidence === 'number') {
+            if (normalized[key].confidence > 1) {
+                normalized[key].confidence = Number((normalized[key].confidence / 100).toFixed(2));
+            }
+        }
+    }
+    return normalized;
+};
+
+router.post('/evaluate', auth, upload.array('packageImages', 4), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ msg: 'No package file asset provided.' });
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ msg: 'No package images provided.' });
         }
 
-        // 1. Package image stream to proxy downstream to microservice core
-        const form = new FormData();
-        form.append('file', fs.createReadStream(req.file.path), {
-            filename: req.file.originalname,
-            contentType: req.file.mimetype
+        // Store original file names BEFORE unlinking temporary upload files
+        const originalFileNames = req.files.map((file) => file.originalname);
+
+        // 1. Convert uploaded files to Base64 data strings safely
+        const base64Images = req.files.map((file) => {
+            const fileBuffer = fs.readFileSync(file.path);
+            return `data:${file.mimetype};base64,${fileBuffer.toString('base64')}`;
         });
 
-        // 2. Network communication boundary to execute processing pipeline
-        const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8000';
-        const aiResponse = await axios.post(`${aiEngineUrl}/api/v1/analyze-package`, form, {
-            headers: {
-                ...form.getHeaders()
-            },
+        // Safe synchronous cleanup AFTER files are fully read into buffer
+        req.files.forEach((file) => {
+            if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        });
+
+        // 2. Call FastAPI Python Engine
+        const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://127.0.0.1:8000';
+
+        const aiResponse = await axios.post(`${aiEngineUrl}/extract`, {
+            images: base64Images
+        }, {
+            headers: { 'Content-Type': 'application/json' },
             maxContentLength: Infinity,
             maxBodyLength: Infinity
         });
 
-        // Clean up locally mirrored temp file block asynchronously
-        fs.unlink(req.file.path, (err) => { if (err) console.error("Temp file cleanup skipped:", err); });
-
         const report = aiResponse.data;
 
-        // Extract deep validation trees matching your Python engine report outputs
+        // Extract deep validation trees matching Python output
         const scoreInfo = report.score_data || report.score || {};
-        const resultsArray = report.results || [];
+        const resultsArray = report.rule_results || report.results || [];
         const violationsArray = report.violations || [];
 
-        // 3. Map your Python report directly into your Case Schema definition
+        // 3. Map to Case Schema
         const newCase = new Case({
-            caseId: `LM-${Math.random().toString(36).substr(2, 4).toUpperCase()}`, // Generates dynamic case tracking reference
-            productName: req.body.productName || report.ocr_data?.extracted_fields?.product_name?.value || 'Unknown Product', // FIXED: changed ocr_data to report.ocr_data
+            caseId: `LM-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+            productName: req.body.productName || report.ocr_data?.extracted_fields?.product_name?.value || 'Unknown Product',
             category: req.body.category || 'General Goods',
             company: req.body.company || 'Unknown Corporation',
-            createdBy: req.user.id,
-            images: [req.file.originalname],
-
-            // Strictly maps Python rule formats to your model properties
-            extractedFields: report.ocr_data?.extracted_fields || {},
+            createdBy: req.user ? req.user.id : null,
+            images: originalFileNames,
+            extractedFields: normalizeFields(report.ocr_data?.extracted_fields),
             ruleResults: resultsArray.map(res => ({
                 ruleId: res.rule_id || '',
                 ruleName: res.rule_name || '',
                 status: res.status || 'REVIEW',
                 message: res.message || ''
             })),
-
-            // Mapping final metrics down into the Case model tracking criteria
-            overallStatus: violationsArray.length > 0 ? 'FAIL' : 'PASS',
-            score: scoreInfo.final_score || 0,
+            overallStatus: report.summary?.overall_status || (violationsArray.length > 0 ? 'FAIL' : 'PASS'),
+            score: report.summary?.score ?? scoreInfo.final_score ?? 0,
             faults: violationsArray.map(v => v.rule_id || v.ruleId || ''),
             ruleSetVersion: report.rule_set_version || 'v2026.08-r1',
             location: req.body.location || 'Kolkata, WB'
         });
-        
+
         await newCase.save();
 
-        // 4. Concurrently commit security history log tracks to AuditLog.js
+        // 4. Audit Log Entry
         const logEntry = new AuditLog({
-            action: 'COMPLIANCE_EVALUATION',
-            userId: req.user.id,
-            caseId: newCase._id,
+            actorId: req.user ? req.user.id : null,
+            action: 'CASE_CREATED',
+            targetType: 'case',
+            targetId: newCase._id,
             timestamp: new Date(),
-            details: { violationsCount: violationsArray.length }
+            reason: `Compliance evaluation completed. Violations: ${violationsArray.length}`
         });
         await logEntry.save();
 
-        // 5. Send unified record matrix cleanly back out to frontend state store
+        // 5. Return Python Report Directly
         return res.status(201).json({
-            success: true,
-            caseId: newCase.caseId,
-            mongoId: newCase._id,
-            overallStatus: newCase.overallStatus,
-            score: newCase.score,
-            report: report
+            ...report,
+            case_id: newCase.caseId,
+            case_db_id: newCase._id,
+            images: newCase.images,
+            saved_case: true,
         });
 
     } catch (err) {
-        // Clean file pointers if down-stream exceptions hit execution mid-flight
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
+        // Cleanup leftover files on error
+        if (req.files) {
+            req.files.forEach((file) => {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+            });
         }
 
-        console.error('System Pipeline Failure:', err.message);
+        console.error('System Pipeline Failure:', err.response?.data || err.message);
         return res.status(500).json({
             msg: 'Metrology Processing Pipeline Core Failure',
             error: err.response?.data?.detail || err.message

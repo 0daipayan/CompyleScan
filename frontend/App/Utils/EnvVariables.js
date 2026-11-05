@@ -1,7 +1,1 @@
-// import { BASE_URL } from '@env';
-
-// const MAIN_BASE_URL = BASE_URL;
-
-// export {
-//     MAIN_BASE_URL
-// };
+export const MAIN_BASE_URL = 'http://10.200.146.57:5000';

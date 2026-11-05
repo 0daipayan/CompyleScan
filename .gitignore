@@ -3,3 +3,21 @@ ocr/__pycache__/
 ocr/output/
 __pycache__/
 *.pyc
+# Environment variables
+.env
+backend/.env
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Debug logs
+*.log
+
+# Backup files and folders
+BACKUP_BEFORE_ULTRA_FAST/
+today_backup.patch
+
+# Debug images
+ocr/debug_detected_label.png
+ocr/debug_image_improvement/

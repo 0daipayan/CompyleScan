@@ -22,10 +22,16 @@ app.get('/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/compylescan';
 
-mongoose.connect(process.env.MONGO_URI || '')
-  .then(() => {
-    console.log('MongoDB Connected Successfully');
-    app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
-  })
-  .catch((err) => console.error('MongoDB Connection Error:', err));
+mongoose.connect(mongoURI, {
+  family: 4, // Forces IPv4 instead of trying IPv6 ::1
+})
+.then(() => {
+  console.log('MongoDB Connected Successfully to Local Instance');
+  app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+})
+.catch((err) => {
+  console.error('MongoDB Connection Error:', err);
+  console.log('\n👉 Tip: Make sure MongoDB Community Server is running.');
+});

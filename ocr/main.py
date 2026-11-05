@@ -17,6 +17,8 @@ Flow:
         ↓
     field-aware scoring
         ↓
+    merge useful fields from OCR candidates
+        ↓
     best OCR result
         ↓
     final quality decision
@@ -54,7 +56,10 @@ from preprocessing.preprocess import (
 )
 
 from ocr_engine import extract_all_variants
-from json_formatter import build_structured_json
+from json_formatter import (
+    build_structured_json,
+    reconcile_ocr_fields_from_texts,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +102,74 @@ def _score_variant(variant_result: dict) -> tuple:
     )
 
     return score, structured
+
+
+# ---------------------------------------------------------------------------
+# Recalculate metadata after cross-variant field recovery
+# ---------------------------------------------------------------------------
+
+def _finalize_merged_structured(structured: dict) -> dict:
+    """
+    Rebuild the metadata that depends on the final merged 9-field payload.
+
+    Important: the winning OCR candidate may be missing fields that are
+    recovered from another preprocessing/PSM candidate.  The original
+    candidate's _meta therefore cannot be left unchanged after the merge.
+    """
+    expected_fields = [
+        "manufacturer",
+        "country_of_origin",
+        "product_name",
+        "net_quantity",
+        "manufacture_date",
+        "best_before",
+        "mrp",
+        "consumer_care",
+        "unit_sale_price",
+    ]
+
+    def _valid(value):
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, dict):
+            return any(
+                isinstance(v, str) and v.strip()
+                for v in value.values()
+            )
+        return True
+
+    fields_found = sum(
+        1 for field in expected_fields
+        if _valid(structured.get(field))
+    )
+
+    meta = dict(structured.get("_meta") or {})
+    old_notes = meta.get("extraction_notes") or []
+
+    # Keep useful notes that are not merely stale "not detected" messages.
+    stale_prefixes = tuple(
+        f"{field} not detected" for field in expected_fields
+    )
+    notes = [
+        note for note in old_notes
+        if not any(str(note).startswith(prefix) for prefix in stale_prefixes)
+    ]
+
+    for field in expected_fields:
+        if not _valid(structured.get(field)):
+            notes.append(f"{field} not detected, needs manual review")
+
+    meta["fields_found"] = fields_found
+    meta["fields_expected"] = len(expected_fields)
+    meta["field_completeness"] = round(
+        fields_found / len(expected_fields) * 100, 1
+    )
+    meta["extraction_notes"] = notes
+
+    structured["_meta"] = meta
+    return structured
 
 
 # ---------------------------------------------------------------------------
@@ -204,22 +277,29 @@ def process_product_image(
             )
 
             # ---------------------------------------------------------------
-            # Run our normal preprocessing on the detected label
-            # ---------------------------------------------------------------
+            # Run a focused preprocessing pass on the detected label.
+            # The label is already perspective-corrected, so keep only the
+            # primary view and one adaptive fallback.
+            label_variants = generate_variants(temp_label_path)
 
-            label_variants = generate_variants(
-                temp_label_path
+            preferred_label_names = (
+                "rot0_quality_primary",
+                "rot0_quality_adaptive",
             )
 
-            # ---------------------------------------------------------------
-            # Add them to the main candidate collection
-            # ---------------------------------------------------------------
+            added_label = 0
+            for preferred_name in preferred_label_names:
+                img = label_variants.get(preferred_name)
+                if img is None:
+                    continue
 
-            for name, img in label_variants.items():
+                variants[f"label_{preferred_name}"] = img
+                added_label += 1
 
-                variants[
-                    f"label_{name}"
-                ] = img
+            # Compatibility fallback for custom variant names.
+            if added_label == 0 and label_variants:
+                name, img = next(iter(label_variants.items()))
+                variants[f"label_{name}"] = img
 
             # ---------------------------------------------------------------
             # Remove temporary file
@@ -302,7 +382,7 @@ def process_product_image(
         )
 
     # -----------------------------------------------------------------------
-    # Step 8: Select best result
+    # Step 8: Select best overall result
     # -----------------------------------------------------------------------
 
     if not scored:
@@ -326,6 +406,96 @@ def process_product_image(
     best_completeness = best_score[0]
 
     best_confidence = best_score[2]
+
+    # -----------------------------------------------------------------------
+    # Step 8B: Merge fields across ALL OCR candidates
+    # -----------------------------------------------------------------------
+
+    merged_structured = dict(best_structured)
+
+    fields_to_merge = [
+        "manufacturer",
+        "country_of_origin",
+        "product_name",
+        "net_quantity",
+        "manufacture_date",
+        "best_before",
+        "mrp",
+        "consumer_care",
+        "unit_sale_price",
+    ]
+
+    # -----------------------------------------------------------------------
+    # FINAL FIELD-SPECIFIC EVIDENCE RECONCILIATION
+    # -----------------------------------------------------------------------
+    # Reconcile ALL preprocessing/PSM OCR texts before finalizing fields.
+    # This is intentionally allowed to correct an already-populated field:
+    # a plausible OCR value such as 730 MRP can still be wrong.
+    evidence_texts = [
+        str(vr.get("text", "") or "")
+        for _, vr, _ in scored
+        if isinstance(vr, dict) and str(vr.get("text", "") or "").strip()
+    ]
+
+    reconciled_fields = reconcile_ocr_fields_from_texts(
+        evidence_texts,
+        seed=merged_structured,
+    )
+
+    for field in fields_to_merge:
+        value = reconciled_fields.get(field)
+        if value is not None:
+            merged_structured[field] = value
+
+    for field in fields_to_merge:
+
+        # If the winning candidate already contains this field,
+        # leave it untouched for now.
+        if merged_structured.get(field) is not None:
+            continue
+
+        # Search all OCR candidates for this missing field.
+        for score_key, variant_result, structured in scored:
+
+            candidate_value = structured.get(field)
+
+            # Ignore missing/empty candidates.
+            if candidate_value is None:
+                continue
+
+            if isinstance(candidate_value, str):
+                if not candidate_value.strip():
+                    continue
+
+            # --- MRP Sanity Guard ---
+            if field == "mrp" and isinstance(candidate_value, (int, float)):
+                # If OCR dropped the decimal point (e.g. 299000 instead of 2990.00)
+                if candidate_value > 50000:
+                    val_str = str(int(candidate_value))
+                    if val_str.endswith("00"):
+                        candidate_value = candidate_value / 100.0
+                    else:
+                        # Reject corrupted integer read from low-quality OCR variant
+                        continue
+
+            # Recover the field.
+            merged_structured[field] = candidate_value
+
+            print(
+                f"OCR field recovered: "
+                f"{field} = {candidate_value} "
+                f"from {variant_result['variant']}"
+            )
+
+            break
+
+    # Use the merged result from this point onward.
+    # Recalculate completeness because recovered fields changed the payload.
+    best_structured = _finalize_merged_structured(
+        merged_structured
+    )
+
+    best_completeness = best_structured["_meta"]["field_completeness"]
 
     # -----------------------------------------------------------------------
     # Step 9: Build scores for every variant
@@ -356,6 +526,37 @@ def process_product_image(
     )
 
     # -----------------------------------------------------------------------
+    # Step 10B: Sticker / label evidence guard
+    # -----------------------------------------------------------------------
+    # Do not reject an image solely because structured field completeness
+    # is 0% when OCR clearly found label/sticker markers. Continue the
+    # pipeline and mark the result for review instead.
+    combined_raw_ocr = " ".join(
+        str(vr.get("text", ""))
+        for vr in all_variant_results
+        if isinstance(vr, dict)
+    )
+
+    has_sticker_data = any(
+        keyword in combined_raw_ocr.upper()
+        for keyword in ["MFG", "MRP", "B.NO", "USP", "RS."]
+    )
+
+    if (
+        best_completeness == 0
+        and has_sticker_data
+        and verdict.get("status") == "rejected"
+    ):
+        verdict = {
+            **verdict,
+            "status": "needs_review",
+            "reason": (
+                "Label/sticker evidence detected, but no structured "
+                "fields were confidently extracted. Manual review required."
+            )
+        }
+
+    # -----------------------------------------------------------------------
     # Step 11: Build response
     # -----------------------------------------------------------------------
 
@@ -376,6 +577,9 @@ def process_product_image(
 
         "field_completeness":
             best_completeness,
+
+        "has_sticker_data":
+            has_sticker_data,
 
         "all_variant_scores":
             all_variant_scores,

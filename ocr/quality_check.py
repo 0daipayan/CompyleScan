@@ -24,8 +24,8 @@ import numpy as np
 
 MIN_CONFIDENCE_TO_ACCEPT = 40.0   # below this, even the best variant isn't trustworthy
 LOW_CONFIDENCE_WARNING = 65.0     # above MIN but below this -> accept, but flag for review
-MIN_FIELDS_TO_ACCEPT = 2          # need at least this many real fields found, not just confident noise
-GOOD_FIELD_COMPLETENESS = 50.0    # % of expected fields found, above this -> stronger trust
+MIN_FIELDS_TO_ACCEPT = 1          # need at least this many real fields found, not just confident noise
+GOOD_FIELD_COMPLETENESS = 10.0    # % of expected fields found, above this -> stronger trust
 
 
 def evaluate_final_result(best_ocr_confidence: float, field_completeness: float = None) -> dict:

@@ -21,6 +21,22 @@ perspective correction.
 import cv2
 import numpy as np
 
+def preprocess_tube_image(image_path_or_array):
+    if isinstance(image_path_or_array, str):
+        img = cv2.imread(image_path_or_array, cv2.IMREAD_GRAYSCALE)
+    else:
+        img = image_path_or_array
+
+    # CLAHE contrast enhancement for reflective surfaces
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(img)
+    
+    # Adaptive Thresholding to separate curved text
+    thresh = cv2.adaptiveThreshold(
+        enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 11, 2
+    )
+    return thresh
 
 # ============================================================
 # BASIC IMAGE FUNCTIONS
@@ -378,6 +394,28 @@ def upscale_if_small(
 
     new_size = (
         min_width,
+        int(h * scale)
+    )
+
+    return cv2.resize(
+        image,
+        new_size,
+        interpolation=cv2.INTER_CUBIC
+    )
+def upscale_for_ocr(
+    image: np.ndarray,
+    target_width: int = 1400
+) -> np.ndarray:
+
+    h, w = image.shape[:2]
+
+    if w >= target_width:
+        return image
+
+    scale = target_width / w
+
+    new_size = (
+        target_width,
         int(h * scale)
     )
 
@@ -1258,6 +1296,10 @@ def detect_and_warp_label(
                     warped.shape[0]
                     * warped.shape[1]
                 )
+                warped = upscale_for_ocr(
+    warped,
+    target_width=1400
+)
 
                 original_area = (
                     h * w
@@ -1305,6 +1347,10 @@ def detect_and_warp_label(
                 original,
                 best["points"]
             )
+            warped = upscale_for_ocr(
+    warped,
+    target_width=1400
+)
 
             if warped.size > 0:
 
@@ -1350,3 +1396,673 @@ def detect_and_warp_label(
         )
 
     return original
+# ============================================================
+# OCR IMAGE IMPROVEMENT
+# ============================================================
+
+def _gray_world_balance(image):
+    """
+    Mild color/illumination correction.
+
+    Useful for photographs with a warm/cool lighting cast.
+    Keeps the correction conservative so text is not damaged.
+    """
+
+    image = image.astype(np.float32)
+
+    mean_b = np.mean(image[:, :, 0])
+    mean_g = np.mean(image[:, :, 1])
+    mean_r = np.mean(image[:, :, 2])
+
+    mean_gray = (mean_b + mean_g + mean_r) / 3.0
+
+    image[:, :, 0] *= mean_gray / max(mean_b, 1.0)
+    image[:, :, 1] *= mean_gray / max(mean_g, 1.0)
+    image[:, :, 2] *= mean_gray / max(mean_r, 1.0)
+
+    return np.clip(image, 0, 255).astype(np.uint8)
+
+
+def correct_illumination(gray):
+    """
+    Flatten uneven lighting.
+
+    This is particularly useful for photographs where one side
+    of the package is darker than the other.
+    """
+
+    # Estimate the slowly changing background illumination.
+    background = cv2.GaussianBlur(
+        gray,
+        (0, 0),
+        sigmaX=25,
+        sigmaY=25
+    )
+
+    background = np.maximum(
+        background,
+        1
+    )
+
+    normalized = cv2.divide(
+        gray,
+        background,
+        scale=255
+    )
+
+    return normalized
+
+
+def upscale_for_improvement(
+    image,
+    target_height=1800
+):
+    """
+    Upscale small label images so small printed characters
+    occupy more pixels for Tesseract.
+    """
+
+    h, w = image.shape[:2]
+
+    if h >= target_height:
+        return image
+
+    scale = target_height / float(h)
+
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    return cv2.resize(
+        image,
+        (new_w, new_h),
+        interpolation=cv2.INTER_CUBIC
+    )
+
+
+def sharpen_for_ocr(gray):
+    """
+    Mild unsharp masking.
+
+    Avoids aggressive sharpening because that can turn
+    characters such as I, l, 1, and punctuation into noise.
+    """
+
+    blurred = cv2.GaussianBlur(
+        gray,
+        (0, 0),
+        sigmaX=1.2
+    )
+
+    sharpened = cv2.addWeighted(
+        gray,
+        1.35,
+        blurred,
+        -0.35,
+        0
+    )
+
+    return np.clip(
+        sharpened,
+        0,
+        255
+    ).astype(np.uint8)
+
+
+def crop_ocr_borders(image, margin_ratio=0.015):
+    """
+    Remove a very small border around the detected label.
+
+    We deliberately keep this conservative because useful text
+    can sometimes be close to the package edge.
+    """
+
+    h, w = image.shape[:2]
+
+    mx = int(w * margin_ratio)
+    my = int(h * margin_ratio)
+
+    if w <= 2 * mx or h <= 2 * my:
+        return image
+
+    return image[
+        my:h - my,
+        mx:w - mx
+    ]
+
+
+def improve_label_image(label_image):
+    """
+    Main Phase-1 OCR image improvement.
+
+    Input:
+        BGR label/package image produced by detect_and_warp_label()
+
+    Output:
+        A small set of deliberate OCR candidates.
+
+    Candidates:
+        primary
+        high_contrast
+        threshold
+    """
+
+    if label_image is None:
+        raise ValueError(
+            "label_image cannot be None"
+        )
+
+    # --------------------------------------------------------
+    # 1. Mild color correction
+    # --------------------------------------------------------
+
+    balanced = _gray_world_balance(
+        label_image
+    )
+
+    # --------------------------------------------------------
+    # 2. Convert to grayscale
+    # --------------------------------------------------------
+
+    gray = to_grayscale(
+        balanced
+    )
+
+    # --------------------------------------------------------
+    # 3. Mild noise reduction
+    # --------------------------------------------------------
+
+    gray = cv2.GaussianBlur(
+        gray,
+        (3, 3),
+        0
+    )
+
+    # --------------------------------------------------------
+    # 4. Flatten uneven illumination
+    # --------------------------------------------------------
+
+    flat = correct_illumination(
+        gray
+    )
+
+    # --------------------------------------------------------
+    # 5. Local contrast enhancement
+    # --------------------------------------------------------
+
+    clahe = cv2.createCLAHE(
+        clipLimit=2.0,
+        tileGridSize=(8, 8)
+    )
+
+    enhanced = clahe.apply(
+        flat
+    )
+
+    # --------------------------------------------------------
+    # 6. Mild sharpening
+    # --------------------------------------------------------
+
+    sharpened = sharpen_for_ocr(
+        enhanced
+    )
+
+    # --------------------------------------------------------
+    # 7. Remove tiny unnecessary border
+    # --------------------------------------------------------
+
+    sharpened = crop_ocr_borders(
+        sharpened
+    )
+
+    # --------------------------------------------------------
+    # 8. Upscale
+    # --------------------------------------------------------
+
+    primary = upscale_for_improvement(
+    sharpened,
+    target_height=1800
+)
+
+    # --------------------------------------------------------
+    # Candidate 2: stronger contrast
+    # --------------------------------------------------------
+
+    high_contrast = cv2.normalize(
+        primary,
+        None,
+        alpha=0,
+        beta=255,
+        norm_type=cv2.NORM_MINMAX
+    )
+
+    # --------------------------------------------------------
+    # Candidate 3: adaptive threshold
+    # --------------------------------------------------------
+
+    threshold = cv2.adaptiveThreshold(
+        primary,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        11
+    )
+
+    return {
+        "primary": primary,
+        "high_contrast": high_contrast,
+        "threshold": threshold,
+    }
+
+
+# ============================================================
+# PHASE-2 OCR ROBUSTNESS UPGRADE
+# ============================================================
+# Appended to the existing pipeline so all original functions and
+# variants remain available. Targets blur, glare, uneven lighting,
+# small text and coloured/reflective packaging.
+# ============================================================
+
+def assess_image_quality(image):
+    """Return conservative image-quality measurements."""
+    if image is None:
+        return {
+            "brightness": 0.0, "contrast": 0.0,
+            "sharpness": 0.0, "glare_ratio": 0.0,
+            "width": 0, "height": 0
+        }
+
+    gray = to_grayscale(image)
+    h, w = gray.shape[:2]
+
+    return {
+        "brightness": float(np.mean(gray)),
+        "contrast": float(np.std(gray)),
+        "sharpness": float(
+            cv2.Laplacian(gray, cv2.CV_64F).var()
+        ),
+        "glare_ratio": float(np.mean(gray >= 250)),
+        "width": w,
+        "height": h
+    }
+
+
+def correct_glare(gray):
+    """
+    Conservative reduction of strong reflection regions.
+    Completely hidden text cannot be reconstructed, so this only
+    handles small/medium highlights and otherwise preserves input.
+    """
+    if gray is None:
+        return gray
+
+    bright_mask = cv2.inRange(gray, 248, 255)
+
+    if float(np.mean(bright_mask > 0)) < 0.005:
+        return gray.copy()
+
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (5, 5)
+    )
+
+    mask = cv2.dilate(
+        bright_mask,
+        kernel,
+        iterations=1
+    )
+
+    if float(np.mean(mask > 0)) > 0.18:
+        return gray.copy()
+
+    return cv2.inpaint(
+        gray,
+        mask,
+        3,
+        cv2.INPAINT_TELEA
+    )
+
+
+def local_illumination_correction(gray):
+    """Flatten gradual lighting differences across a package."""
+    if gray is None:
+        return gray
+
+    background = cv2.GaussianBlur(
+        gray,
+        (0, 0),
+        sigmaX=31,
+        sigmaY=31
+    )
+
+    background = np.maximum(
+        background.astype(np.float32),
+        8.0
+    )
+
+    normalized = cv2.divide(
+        gray.astype(np.float32),
+        background,
+        scale=180.0
+    )
+
+    return cv2.normalize(
+        normalized,
+        None,
+        0,
+        255,
+        cv2.NORM_MINMAX
+    ).astype(np.uint8)
+
+
+def mild_deblur(gray):
+    """
+    Mild edge recovery for soft photographs.
+    Avoids aggressive deconvolution that can manufacture digits.
+    """
+    if gray is None:
+        return gray
+
+    blur_score = float(
+        cv2.Laplacian(gray, cv2.CV_64F).var()
+    )
+
+    if blur_score >= 45:
+        return gray.copy()
+
+    soft = cv2.GaussianBlur(
+        gray,
+        (0, 0),
+        sigmaX=1.0
+    )
+
+    return cv2.addWeighted(
+        gray,
+        1.25,
+        soft,
+        -0.25,
+        0
+    )
+
+
+def resize_for_text(
+    image,
+    min_dimension=1400,
+    max_dimension=2600
+):
+    """
+    Resolution-aware enlargement. Does not enlarge already-large
+    images unnecessarily.
+    """
+    if image is None:
+        return image
+
+    h, w = image.shape[:2]
+    smallest = min(h, w)
+
+    if smallest >= min_dimension:
+        return image
+
+    scale = min_dimension / float(max(1, smallest))
+
+    if max(h, w) * scale > max_dimension:
+        scale = max_dimension / float(max(h, w))
+
+    if scale <= 1.01:
+        return image
+
+    new_w = max(1, int(round(w * scale)))
+    new_h = max(1, int(round(h * scale)))
+
+    return cv2.resize(
+        image,
+        (new_w, new_h),
+        interpolation=cv2.INTER_CUBIC
+    )
+
+
+def make_ocr_ready_candidates(image):
+    """
+    Produce additional OCR candidates for difficult photographs.
+    Candidate selection remains the responsibility of ocr_engine.py.
+    """
+    if image is None:
+        return {}
+
+    quality = assess_image_quality(image)
+
+    working = image.copy()
+
+    if len(working.shape) == 3:
+        working = _gray_world_balance(working)
+
+    gray = to_grayscale(working)
+
+    gray = cv2.GaussianBlur(
+        gray,
+        (3, 3),
+        0
+    )
+
+    glare_reduced = correct_glare(gray)
+
+    illumination = local_illumination_correction(
+        glare_reduced
+    )
+
+    deblurred = mild_deblur(
+        illumination
+    )
+
+    clahe = cv2.createCLAHE(
+        clipLimit=2.2,
+        tileGridSize=(8, 8)
+    )
+
+    contrast = clahe.apply(
+        deblurred
+    )
+
+    contrast = resize_for_text(
+        contrast
+    )
+
+    candidates = {
+        "quality_primary": contrast,
+        "quality_sharp": sharpen_for_ocr(contrast)
+    }
+
+    candidates["quality_adaptive"] = cv2.adaptiveThreshold(
+        contrast,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        9
+    )
+
+    _, otsu = cv2.threshold(
+        contrast,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+
+    candidates["quality_otsu"] = otsu
+
+    inverted = cv2.bitwise_not(contrast)
+
+    candidates["quality_inverted"] = cv2.adaptiveThreshold(
+        inverted,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        9
+    )
+
+    candidates["quality_local_strong"] = cv2.adaptiveThreshold(
+        contrast,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        41,
+        13
+    )
+
+    # Metadata is retained internally but does not alter the
+    # existing generate_variants() dictionary contract.
+    candidates["_quality"] = quality
+
+    return candidates
+
+
+# Preserve the complete original implementation.
+_legacy_generate_variants = generate_variants
+
+
+def generate_variants(image_path: str) -> dict:
+    """
+    Upgraded generator: original variants + quality-aware variants.
+    """
+    variants = _legacy_generate_variants(image_path)
+
+    image = read_image(image_path)
+
+    orientations = {
+        "quality_rot0": image,
+        "quality_rot90": cv2.rotate(
+            image,
+            cv2.ROTATE_90_CLOCKWISE
+        ),
+        "quality_rot180": cv2.rotate(
+            image,
+            cv2.ROTATE_180
+        ),
+        "quality_rot270": cv2.rotate(
+            image,
+            cv2.ROTATE_90_COUNTERCLOCKWISE
+        )
+    }
+
+    for orientation_name, oriented in orientations.items():
+        try:
+            extra = make_ocr_ready_candidates(oriented)
+        except Exception:
+            # Experimental processing must never break the original path.
+            continue
+
+        for candidate_name, candidate_image in extra.items():
+            if candidate_name == "_quality":
+                continue
+            if candidate_image is None:
+                continue
+
+            variants[
+                f"{orientation_name}_{candidate_name}"
+            ] = candidate_image
+
+    return variants
+
+
+def preprocess_tube_image(image_path_or_array):
+    """
+    Preserve the public function used by ocr_engine.py while using
+    the improved primary OCR candidate.
+    """
+    if isinstance(image_path_or_array, str):
+        img = cv2.imread(
+            image_path_or_array,
+            cv2.IMREAD_COLOR
+        )
+    else:
+        img = image_path_or_array
+
+    if img is None:
+        return None
+
+    candidates = make_ocr_ready_candidates(img)
+
+    primary = candidates.get("quality_primary")
+
+    if primary is not None:
+        return primary
+
+    return to_grayscale(img)
+
+
+
+# ---------------------------------------------------------------------------
+# PERFORMANCE PATCH: focused OCR candidate set
+# ---------------------------------------------------------------------------
+# The full adaptive generator is intentionally retained above.  For the live
+# API path we use a smaller evidence set so Tesseract is not run hundreds of
+# times per uploaded image.
+
+def generate_variants(image_path: str) -> dict:
+    """Generate a focused set of high-value OCR candidates.
+
+    Keeps the quality-aware preprocessing, but avoids the combinatorial
+    explosion of legacy variants x 4 rotations x quality variants.
+    """
+    image = read_image(image_path)
+    if image is None:
+        return {}
+
+    orientations = {
+        "rot0": image,
+        "rot90": cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE),
+        "rot180": cv2.rotate(image, cv2.ROTATE_180),
+        "rot270": cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE),
+    }
+
+    variants = {}
+
+    for orientation_name, oriented in orientations.items():
+        try:
+            candidates = make_ocr_ready_candidates(oriented)
+        except Exception:
+            candidates = {}
+
+        # Three complementary candidates are enough for the live path:
+        # natural/quality image, adaptive threshold, and Otsu.
+        for key in ("quality_primary", "quality_adaptive", "quality_otsu"):
+            candidate = candidates.get(key)
+            if candidate is not None:
+                variants[f"{orientation_name}_{key}"] = candidate
+
+    return variants
+
+# ============================================================================
+# ULTRA-FAST LIVE OCR OVERRIDE
+# ============================================================================
+# The previous FAST patch still produced 12 variants (4 rotations x 3
+# preprocessings).  For normal mobile package photos this is unnecessary and
+# was multiplying Tesseract calls.  The live path now uses only the natural
+# orientation.  The existing preprocessing functions remain available for
+# debugging/backward compatibility.
+
+def generate_variants(image_path: str) -> dict:
+    """Return only the three highest-value live OCR candidates."""
+    image = read_image(image_path)
+    if image is None:
+        return {}
+
+    try:
+        candidates = make_ocr_ready_candidates(image)
+    except Exception:
+        candidates = {}
+
+    variants = {}
+    for key in ("quality_primary", "quality_adaptive", "quality_otsu"):
+        candidate = candidates.get(key)
+        if candidate is not None:
+            variants[f"rot0_{key}"] = candidate
+
+    # Guaranteed fallback: one grayscale image if the quality builder fails.
+    if not variants:
+        gray = to_grayscale(image)
+        if gray is not None:
+            variants["rot0_gray"] = gray
+
+    return variants

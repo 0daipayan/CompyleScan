@@ -1,294 +1,532 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
+  Image,
+  Alert,
   Switch,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { moderateScale } from '../../Constants/PixelRatio';
-import { useDispatch } from 'react-redux';
-import { logout } from '../../Redux/reducer/User';
 
-const InspectorProfile = () => {
+import { Container, Text } from 'react-native-basic-elements';
+import { moderateScale } from '../../Constants/PixelRatio';
+
+import { useDispatch, useSelector } from 'react-redux';
+import { logout } from '../../Redux/reducer/User';
+import Storage from '../../Utils/Storage';
+
+const InspectorProfile = ({ navigation }) => {
   const dispatch = useDispatch();
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [biometricLogin, setBiometricLogin] = useState(true);
-  const [offlineSync, setOfflineSync] = useState(false);
+
+  // Get the currently logged-in user from Redux
+  const userData = useSelector(state => state.User?.userData);
+
+  // Never use hard-coded profile information
+  const name = userData?.name || 'Inspector';
+  const officerId = userData?.officerId || '—';
+  const email = userData?.email || '—';
+  const jurisdiction = userData?.jurisdiction || 'West Bengal';
+
+  // Simple initials for profile avatar
+  const getInitials = () => {
+    if (!name || name === 'Inspector') {
+      return 'IN';
+    }
+
+    const parts = name.trim().split(' ');
+
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+
+    return (
+      parts[0].charAt(0) +
+      parts[parts.length - 1].charAt(0)
+    ).toUpperCase();
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Sign out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Remove saved authentication token
+              if (Storage?.remove) {
+                await Storage.remove('token');
+              } else if (Storage?.set) {
+                await Storage.set('token', null);
+              }
+
+              // Clear Redux user
+              dispatch(logout());
+            } catch (error) {
+              console.error('Logout error:', error);
+
+              // Still clear Redux even if storage fails
+              dispatch(logout());
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
-    <View style={styles.mainContainer}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Dark Header Banner */}
-        <View style={styles.topHeaderBanner} />
+    <Container style={styles.container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
 
-        {/* Profile Details Container */}
-        <View style={styles.profileContent}>
-          {/* Avatar Section Overlapping Banner */}
+        {/* ================= HEADER ================= */}
+
+        <View style={styles.header}>
+
           <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>RV</Text>
-            <TouchableOpacity style={styles.editBadge}>
-              <Icon name="pencil" size={moderateScale(11)} color="#FFFFFF" />
-            </TouchableOpacity>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {getInitials()}
+              </Text>
+            </View>
+
+            <View style={styles.onlineBadge} />
           </View>
 
-          <View style={styles.nameRow}>
-            <Text style={styles.userName}>Rahul Verma</Text>
-            <Icon name="check-circle" size={moderateScale(18)} color="#059669" />
-          </View>
-
-          <Text style={styles.userRoleText}>
-            LM-2026-0533 · Legal Metrology, West Bengal
+          <Text style={styles.name}>
+            {name}
           </Text>
 
-          <View style={styles.badgePill}>
-            <Text style={styles.badgePillText}>FIELD INSPECTOR</Text>
+          <Text style={styles.idText}>
+            {officerId} · Legal Metrology, {jurisdiction}
+          </Text>
+
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleText}>
+              FIELD INSPECTOR
+            </Text>
           </View>
 
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>184</Text>
-              <Text style={styles.statLabel}>Total scans</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>81</Text>
-              <Text style={styles.statLabel}>Avg. score</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>6</Text>
-              <Text style={styles.statLabel}>Pending review</Text>
-            </View>
-          </View>
-
-          {/* Contact Details */}
-          <Text style={styles.sectionHeader}>CONTACT DETAILS</Text>
-          <View style={styles.cardBlock}>
-            <View style={styles.infoRow}>
-              <Icon name="email-outline" size={moderateScale(18)} color="#64748B" />
-              <Text style={styles.infoText}>rahul.verma@gov.in</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <Icon name="phone-outline" size={moderateScale(18)} color="#64748B" />
-              <Text style={styles.infoText}>+91 98XXXXXX21</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <Icon name="map-marker-outline" size={moderateScale(18)} color="#64748B" />
-              <Text style={styles.infoText}>Salt Lake Circle, Kolkata</Text>
-            </View>
-          </View>
-
-          {/* Preferences */}
-          <Text style={styles.sectionHeader}>PREFERENCES</Text>
-          <View style={styles.cardBlock}>
-            <View style={styles.switchRow}>
-              <View style={styles.optionLeft}>
-                <Icon name="bell-outline" size={moderateScale(18)} color="#64748B" />
-                <Text style={styles.optionText}>Push notifications</Text>
-              </View>
-              <Switch
-                value={pushNotifications}
-                onValueChange={setPushNotifications}
-                trackColor={{ false: '#E2E8F0', true: '#059669' }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.switchRow}>
-              <View style={styles.optionLeft}>
-                <Icon name="checkbox-marked-outline" size={moderateScale(18)} color="#64748B" />
-                <Text style={styles.optionText}>Face / fingerprint login</Text>
-              </View>
-              <Switch
-                value={biometricLogin}
-                onValueChange={setBiometricLogin}
-                trackColor={{ false: '#E2E8F0', true: '#059669' }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.switchRow}>
-              <View style={styles.optionLeft}>
-                <Icon name="star-outline" size={moderateScale(18)} color="#64748B" />
-                <Text style={styles.optionText}>Offline capture sync</Text>
-              </View>
-              <Switch
-                value={offlineSync}
-                onValueChange={setOfflineSync}
-                trackColor={{ false: '#E2E8F0', true: '#059669' }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-          </View>
-
-          {/* Account & Support */}
-          <Text style={styles.sectionHeader}>ACCOUNT & SUPPORT</Text>
-          <View style={styles.cardBlock}>
-            <TouchableOpacity style={styles.optionRow}>
-              <View style={styles.optionLeft}>
-                <Icon name="lock-outline" size={moderateScale(18)} color="#64748B" />
-                <Text style={styles.optionText}>Change password</Text>
-              </View>
-              <Icon name="chevron-right" size={moderateScale(16)} color="#94A3B8" />
-            </TouchableOpacity>
-            <View style={styles.divider} />
-            <TouchableOpacity style={styles.optionRow}>
-              <View style={styles.optionLeft}>
-                <Icon name="help-circle-outline" size={moderateScale(18)} color="#64748B" />
-                <Text style={styles.optionText}>Help & guidelines</Text>
-              </View>
-              <Icon name="chevron-right" size={moderateScale(16)} color="#94A3B8" />
-            </TouchableOpacity>
-            <View style={styles.divider} />
-            <View style={styles.optionRow}>
-              <View style={styles.optionLeft}>
-                <Icon name="file-document-outline" size={moderateScale(18)} color="#64748B" />
-                <Text style={styles.optionText}>Rule set version</Text>
-              </View>
-              <Text style={styles.versionText}>v2026.07-r3</Text>
-            </View>
-          </View>
-
-          {/* Logout Action */}
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => dispatch(logout())}
-          >
-            <Icon name="logout" size={moderateScale(18)} color="#991B1B" />
-            <Text style={styles.logoutText}>Log out</Text>
-          </TouchableOpacity>
         </View>
+
+        {/* ================= STATISTICS ================= */}
+
+        <View style={styles.statsContainer}>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>
+              Total scans
+            </Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>—</Text>
+            <Text style={styles.statLabel}>
+              Avg. score
+            </Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>
+              Pending review
+            </Text>
+          </View>
+
+        </View>
+
+        {/* ================= CONTACT DETAILS ================= */}
+
+        <Text style={styles.sectionTitle}>
+          CONTACT DETAILS
+        </Text>
+
+        <View style={styles.card}>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>✉</Text>
+
+            <Text style={styles.infoText}>
+              {email}
+            </Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>ID</Text>
+
+            <Text style={styles.infoText}>
+              {officerId}
+            </Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>⌖</Text>
+
+            <Text style={styles.infoText}>
+              {jurisdiction}
+            </Text>
+          </View>
+
+        </View>
+
+        {/* ================= PREFERENCES ================= */}
+
+        <Text style={styles.sectionTitle}>
+          PREFERENCES
+        </Text>
+
+        <View style={styles.card}>
+
+          <View style={styles.preferenceRow}>
+            <Text style={styles.preferenceText}>
+              Push notifications
+            </Text>
+
+            <Switch
+              value={true}
+              onValueChange={() => {}}
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.preferenceRow}>
+            <Text style={styles.preferenceText}>
+              Face / fingerprint login
+            </Text>
+
+            <Switch
+              value={true}
+              onValueChange={() => {}}
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.preferenceRow}>
+            <Text style={styles.preferenceText}>
+              Offline capture sync
+            </Text>
+
+            <Switch
+              value={false}
+              onValueChange={() => {}}
+            />
+          </View>
+
+        </View>
+
+        {/* ================= ACCOUNT & SUPPORT ================= */}
+
+        <Text style={styles.sectionTitle}>
+          ACCOUNT & SUPPORT
+        </Text>
+
+        <View style={styles.card}>
+
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuText}>
+              Account information
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuText}>
+              Help & support
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuText}>
+              Privacy policy
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+
+        {/* ================= LOGOUT ================= */}
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutText}>
+            Sign out
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.versionText}>
+          ComplySpect · AI-Powered Compliance Inspection
+        </Text>
+
       </ScrollView>
-    </View>
+    </Container>
   );
 };
 
 export default InspectorProfile;
 
+
+/* =========================================================
+   STYLES
+========================================================= */
+
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: '#F8FAFC' },
-  container: { flex: 1 },
-  topHeaderBanner: {
-    height: moderateScale(110),
+
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+
+  scrollContent: {
+    paddingBottom: moderateScale(100),
+  },
+
+  /* ---------- HEADER ---------- */
+
+  header: {
     backgroundColor: '#1E293B',
-    width: '100%',
-  },
-  profileContent: {
-    paddingHorizontal: moderateScale(20),
     alignItems: 'center',
+    paddingTop: moderateScale(40),
+    paddingBottom: moderateScale(34),
+    borderBottomLeftRadius: moderateScale(28),
+    borderBottomRightRadius: moderateScale(28),
   },
+
   avatarContainer: {
-    width: moderateScale(88),
-    height: moderateScale(88),
-    borderRadius: moderateScale(44),
-    backgroundColor: '#1E293B',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: moderateScale(-44),
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
     position: 'relative',
+    marginBottom: moderateScale(14),
   },
-  avatarText: { fontSize: moderateScale(26), fontWeight: '700', color: '#FFFFFF' },
-  editBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#059669',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(4),
-    borderWidth: 2,
+
+  avatar: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    backgroundColor: '#0F172A',
+    borderWidth: 4,
     borderColor: '#FFFFFF',
-  },
-  nameRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(6),
-    marginTop: moderateScale(12),
+    justifyContent: 'center',
   },
-  userName: { fontSize: moderateScale(20), fontWeight: '700', color: '#0F172A' },
-  userRoleText: {
-    fontSize: moderateScale(11),
-    color: '#64748B',
-    marginTop: moderateScale(4),
+
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: moderateScale(32),
+    fontWeight: '700',
+  },
+
+  onlineBadge: {
+    position: 'absolute',
+    right: moderateScale(0),
+    bottom: moderateScale(4),
+    width: moderateScale(22),
+    height: moderateScale(22),
+    borderRadius: moderateScale(11),
+    backgroundColor: '#10B981',
+    borderWidth: 3,
+    borderColor: '#1E293B',
+  },
+
+  name: {
+    color: '#FFFFFF',
+    fontSize: moderateScale(24),
+    fontWeight: '700',
+    marginBottom: moderateScale(5),
+  },
+
+  idText: {
+    color: '#CBD5E1',
+    fontSize: moderateScale(13),
     textAlign: 'center',
+    paddingHorizontal: moderateScale(20),
   },
-  badgePill: {
-    marginTop: moderateScale(10),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(12),
-    backgroundColor: '#ECFDF5',
+
+  roleBadge: {
+    marginTop: moderateScale(12),
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(20),
   },
-  badgePillText: { fontSize: moderateScale(10), fontWeight: '700', color: '#047857' },
-  statsRow: {
+
+  roleText: {
+    color: '#047857',
+    fontSize: moderateScale(12),
+    fontWeight: '700',
+  },
+
+  /* ---------- STATS ---------- */
+
+  statsContainer: {
     flexDirection: 'row',
+    paddingHorizontal: moderateScale(20),
+    marginTop: moderateScale(20),
     gap: moderateScale(10),
-    marginVertical: moderateScale(20),
-    width: '100%',
   },
+
   statCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(12),
-    paddingVertical: moderateScale(14),
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    borderRadius: moderateScale(14),
+    paddingVertical: moderateScale(18),
+    alignItems: 'center',
   },
-  statValue: { fontSize: moderateScale(18), fontWeight: '700', color: '#0F172A' },
-  statLabel: { fontSize: moderateScale(10), color: '#64748B', marginTop: moderateScale(2) },
-  sectionHeader: {
-    alignSelf: 'flex-start',
-    fontSize: moderateScale(11),
+
+  statNumber: {
+    color: '#0F172A',
+    fontSize: moderateScale(24),
     fontWeight: '700',
-    color: '#94A3B8',
-    marginBottom: moderateScale(8),
-    letterSpacing: 0.5,
+    marginBottom: moderateScale(4),
   },
-  cardBlock: {
-    width: '100%',
+
+  statLabel: {
+    color: '#64748B',
+    fontSize: moderateScale(11),
+    textAlign: 'center',
+  },
+
+  /* ---------- SECTIONS ---------- */
+
+  sectionTitle: {
+    color: '#94A3B8',
+    fontSize: moderateScale(13),
+    fontWeight: '700',
+    marginTop: moderateScale(28),
+    marginBottom: moderateScale(10),
+    paddingHorizontal: moderateScale(20),
+  },
+
+  /* ---------- CARD ---------- */
+
+  card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(12),
-    paddingHorizontal: moderateScale(14),
-    marginBottom: moderateScale(20),
+    marginHorizontal: moderateScale(20),
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    borderRadius: moderateScale(16),
+    paddingHorizontal: moderateScale(16),
   },
+
+  /* ---------- CONTACT ---------- */
+
   infoRow: {
+    minHeight: moderateScale(62),
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: moderateScale(12),
-    gap: moderateScale(12),
   },
-  infoText: { fontSize: moderateScale(13), color: '#334155' },
-  divider: { height: 1, backgroundColor: '#F1F5F9' },
-  optionRow: {
+
+  infoIcon: {
+    width: moderateScale(34),
+    color: '#64748B',
+    fontSize: moderateScale(15),
+    textAlign: 'center',
+    marginRight: moderateScale(8),
+  },
+
+  infoText: {
+    flex: 1,
+    color: '#334155',
+    fontSize: moderateScale(14),
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+
+  /* ---------- PREFERENCES ---------- */
+
+  preferenceRow: {
+    minHeight: moderateScale(62),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: moderateScale(12),
   },
-  switchRow: {
+
+  preferenceText: {
+    color: '#334155',
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    flex: 1,
+  },
+
+  /* ---------- MENU ---------- */
+
+  menuRow: {
+    minHeight: moderateScale(58),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: moderateScale(6),
   },
-  optionLeft: { flexDirection: 'row', alignItems: 'center', gap: moderateScale(12) },
-  optionText: { fontSize: moderateScale(13), color: '#334155', fontWeight: '500' },
-  versionText: { fontSize: moderateScale(12), color: '#94A3B8' },
+
+  menuText: {
+    color: '#334155',
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+  },
+
+  arrow: {
+    color: '#94A3B8',
+    fontSize: moderateScale(24),
+  },
+
+  /* ---------- LOGOUT ---------- */
+
   logoutButton: {
-    flexDirection: 'row',
+    marginHorizontal: moderateScale(20),
+    marginTop: moderateScale(28),
+    height: moderateScale(48),
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: moderateScale(8),
-    paddingVertical: moderateScale(12),
-    marginBottom: moderateScale(20),
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
   },
-  logoutText: { fontSize: moderateScale(14), fontWeight: '700', color: '#991B1B' },
+
+  logoutText: {
+    color: '#DC2626',
+    fontSize: moderateScale(14),
+    fontWeight: '700',
+  },
+
+  versionText: {
+    textAlign: 'center',
+    color: '#94A3B8',
+    fontSize: moderateScale(11),
+    marginTop: moderateScale(20),
+  },
+
 });

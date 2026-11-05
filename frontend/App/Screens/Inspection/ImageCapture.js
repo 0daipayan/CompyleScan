@@ -9,6 +9,7 @@ import {
   PermissionsAndroid,
   Platform,
 } from 'react-native';
+
 import { Container, Text, AppButton } from 'react-native-basic-elements';
 import { moderateScale } from '../../Constants/PixelRatio';
 import ImagePicker from 'react-native-image-crop-picker';
@@ -29,26 +30,33 @@ const ImageCapture = ({ navigation }) => {
           PermissionsAndroid.PERMISSIONS.CAMERA,
           {
             title: 'Camera Permission',
-            message: 'App needs access to your camera to capture product images.',
+            message:
+              'App needs access to your camera to capture product images.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
           }
         );
+
         return granted === PermissionsAndroid.RESULTS.GRANTED;
       } catch (err) {
         console.warn(err);
         return false;
       }
     }
+
     return true;
   };
 
   // Launch Device Camera
   const captureImage = async (slotKey) => {
     const hasPermission = await requestCameraPermission();
+
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Camera access is required to capture images.');
+      Alert.alert(
+        'Permission Denied',
+        'Camera access is required to capture images.'
+      );
       return;
     }
 
@@ -84,9 +92,11 @@ const ImageCapture = ({ navigation }) => {
     }
   };
 
+  // Render Image Slot
   const renderSlot = (slotKey, title) => {
     const uri = images[slotKey];
 
+    // If image has been captured
     if (uri) {
       return (
         <TouchableOpacity
@@ -95,14 +105,21 @@ const ImageCapture = ({ navigation }) => {
           style={styles.capturedCard}
           onPress={() => captureImage(slotKey)}
         >
-          <Image source={{ uri }} style={styles.imagePreview} />
+          <Image
+            source={{ uri }}
+            style={styles.imagePreview}
+          />
+
           <View style={styles.overlayBadge}>
-            <Text style={styles.overlayText}>{title} · Captured</Text>
+            <Text style={styles.overlayText}>
+              {title} · Captured
+            </Text>
           </View>
         </TouchableOpacity>
       );
     }
 
+    // If image has not been captured
     return (
       <TouchableOpacity
         key={slotKey}
@@ -110,23 +127,38 @@ const ImageCapture = ({ navigation }) => {
         style={styles.dashedCard}
         onPress={() => captureImage(slotKey)}
       >
-        <Image 
-          source={require('../../Assets/camera.png')} 
-          style={styles.slotIcon} 
-          resizeMode="contain" 
+        <Image
+          source={require('../../Assets/camera.png')}
+          style={styles.slotIcon}
+          resizeMode="contain"
         />
-        <Text style={styles.dashedText}>{title}</Text>
+
+        <Text style={styles.dashedText}>
+          {title}
+        </Text>
       </TouchableOpacity>
     );
   };
 
   return (
     <Container style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+
         {/* Header Section */}
-        <Text style={styles.subHeader}>SUNRISE WHEAT FLAKES</Text>
-        <Text style={styles.title}>Capture package</Text>
-        <Text style={styles.description}>Front, back and side panels required</Text>
+        <Text style={styles.subHeader}>
+          SUNRISE WHEAT FLAKES
+        </Text>
+
+        <Text style={styles.title}>
+          Capture package
+        </Text>
+
+        <Text style={styles.description}>
+          Front, back and side panels required
+        </Text>
 
         {/* 2x2 Image Grid */}
         <View style={styles.gridContainer}>
@@ -136,33 +168,48 @@ const ImageCapture = ({ navigation }) => {
           {renderSlot('angle', 'Additional angle')}
         </View>
 
-        {/* Camera Action CTA */}
+        {/* Open Camera Button */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.cameraBtn}
           onPress={handleOpenGeneralCamera}
         >
-          <Image 
-            source={require('../../Assets/camera.png')} 
-            style={styles.btnIcon} 
-            resizeMode="contain" 
+          <Image
+            source={require('../../Assets/camera.png')}
+            style={styles.btnIcon}
+            resizeMode="contain"
           />
-          <Text style={styles.cameraBtnText}>Open camera</Text>
+
+          <Text style={styles.cameraBtnText}>
+            Open camera
+          </Text>
         </TouchableOpacity>
 
-        {/* Submit CTA */}
+        {/* Submit Button */}
         <AppButton
           title="Submit for inspection"
           textStyle={styles.submitBtnText}
           style={styles.submitBtn}
           onPress={() => {
-            if (!images.front && !images.back) {
-              Alert.alert('Image Required', 'Please capture at least the front and back panels.');
+
+            // Front and Back are mandatory
+            if (!images.front || !images.back) {
+              Alert.alert(
+                'Images Required',
+                'Please capture at least the front and back panels.'
+              );
               return;
             }
-            navigation.navigate('Processing', { capturedImages: images });
+
+            // IMPORTANT:
+            // Pass the captured images to Processing screen.
+            navigation.navigate('Processing', {
+              processing: true,
+              capturedImages: images,
+            });
           }}
         />
+
       </ScrollView>
     </Container>
   );
@@ -171,12 +218,44 @@ const ImageCapture = ({ navigation }) => {
 export default ImageCapture;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  scrollContent: { paddingHorizontal: moderateScale(20), paddingTop: moderateScale(40), paddingBottom: moderateScale(20) },
-  subHeader: { fontSize: moderateScale(11), fontWeight: '700', color: '#64748B', letterSpacing: 0.8 },
-  title: { fontSize: moderateScale(24), fontWeight: '700', color: '#0F172A', marginTop: moderateScale(4) },
-  description: { fontSize: moderateScale(13), color: '#64748B', marginBottom: moderateScale(24) },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: moderateScale(20) },
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+
+  scrollContent: {
+    paddingHorizontal: moderateScale(20),
+    paddingTop: moderateScale(40),
+    paddingBottom: moderateScale(20),
+  },
+
+  subHeader: {
+    fontSize: moderateScale(11),
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.8,
+  },
+
+  title: {
+    fontSize: moderateScale(24),
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: moderateScale(4),
+  },
+
+  description: {
+    fontSize: moderateScale(13),
+    color: '#64748B',
+    marginBottom: moderateScale(24),
+  },
+
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: moderateScale(20),
+  },
+
   capturedCard: {
     width: '48%',
     height: moderateScale(130),
@@ -185,7 +264,13 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(12),
     position: 'relative',
   },
-  imagePreview: { width: '100%', height: '100%', resizeMode: 'cover' },
+
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+
   overlayBadge: {
     position: 'absolute',
     bottom: 0,
@@ -196,7 +281,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(6),
     alignItems: 'center',
   },
-  overlayText: { color: '#FFFFFF', fontSize: moderateScale(10), fontWeight: '600' },
+
+  overlayText: {
+    color: '#FFFFFF',
+    fontSize: moderateScale(10),
+    fontWeight: '600',
+  },
+
   dashedCard: {
     width: '48%',
     height: moderateScale(130),
@@ -209,12 +300,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: moderateScale(12),
   },
+
   slotIcon: {
     width: moderateScale(24),
     height: moderateScale(24),
     tintColor: '#64748B',
   },
-  dashedText: { fontSize: moderateScale(12), color: '#64748B', marginTop: moderateScale(8) },
+
+  dashedText: {
+    fontSize: moderateScale(12),
+    color: '#64748B',
+    marginTop: moderateScale(8),
+  },
+
   cameraBtn: {
     backgroundColor: '#E6F4F1',
     borderRadius: moderateScale(12),
@@ -224,13 +322,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: moderateScale(12),
   },
+
   btnIcon: {
     width: moderateScale(20),
     height: moderateScale(20),
     tintColor: '#0D9488',
     marginRight: moderateScale(8),
   },
-  cameraBtnText: { color: '#0D9488', fontSize: moderateScale(15), fontWeight: '600' },
-  submitBtn: { backgroundColor: '#0F172A', borderRadius: moderateScale(12), height: moderateScale(52), justifyContent: 'center' },
-  submitBtnText: { color: '#FFFFFF', fontSize: moderateScale(15), fontWeight: '600' },
+
+  cameraBtnText: {
+    color: '#0D9488',
+    fontSize: moderateScale(15),
+    fontWeight: '600',
+  },
+
+  submitBtn: {
+    backgroundColor: '#0F172A',
+    borderRadius: moderateScale(12),
+    height: moderateScale(52),
+    justifyContent: 'center',
+  },
+
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontSize: moderateScale(15),
+    fontWeight: '600',
+  },
 });
